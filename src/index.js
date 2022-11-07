@@ -15,17 +15,17 @@ export default {
       rights: "http://creativecommons.org/licenses/by/4.0/",
       items: [
         {
-          id: "https://preview.iiif.io/cookbook/master/recipe/0001-mvm-image/canvas/p1",
+          id: "https://db.dl.tlu.ee/iiif/canvas",
           type: "Canvas",
           height: 1800,//replace with real values
           width: 1200,//replace with real values
           items: [
             {
-              id: "https://preview.iiif.io/cookbook/master/recipe/0001-mvm-image/page/p1/1",
+              id: "https://db.dl.tlu.ee/iiif/image/page",
               type: "AnnotationPage",
               items: [
                 {
-                  id: "https://preview.iiif.io/cookbook/master/recipe/0001-mvm-image/annotation/p0001-image",
+                  id: "https://db.dl.tlu.ee/iiif/image",
                   type: "Annotation",
                   motivation: "painting",
                   body: {
@@ -36,7 +36,7 @@ export default {
                     width: 1200,//replace with real values
                   },
                   target:
-                    "https://preview.iiif.io/cookbook/master/recipe/0001-mvm-image/canvas/p1",
+                    "https://db.dl.tlu.ee/iiif/canvas",
                 },
               ],
             },
