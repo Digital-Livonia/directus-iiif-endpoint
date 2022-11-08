@@ -2,6 +2,11 @@
 // selle järgi pärida faili mõõtmed directus_files tabelist ning asendada height ja width väärtused
 // kas api väljund cachetakse kuidagi? tegelit poleks vaja ju uusi päringuid teha alati ...
 
+//DOCS
+// https://docs.directus.io/extensions/endpoints.html
+// https://docs.directus.io/extensions/creating-extensions.html
+
+
 export default {
   id: "iiif",
   handler: (router) => {
