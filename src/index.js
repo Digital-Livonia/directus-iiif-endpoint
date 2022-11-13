@@ -1,3 +1,4 @@
+
 // sisse tulev väärtus on faili ID
 // selle järgi pärida faili mõõtmed directus_files tabelist ning asendada height ja width väärtused
 // kas api väljund cachetakse kuidagi? tegelit poleks vaja ju uusi päringuid teha alati ...
@@ -5,14 +6,11 @@
 //DOCS
 // https://docs.directus.io/extensions/endpoints.html
 // https://docs.directus.io/extensions/creating-extensions.html
-
-
-export default {
-  id: "iiif",
-  handler: (router) => {
-    let jsonObject = {
+const axios = require('axios');
+const createIifJson = (fileId, height, width) => (
+    {
       "@context": "http://iiif.io/api/presentation/3/context.json",
-      id: "https://db.dl.tlu.ee/iiif/manifest/file/file_id", //replace <file_id> with the real value 
+      id: `https://db.dl.tlu.ee/iiif/manifest/file/${fileId}`, //replace <file_id> with the real value
       type: "Manifest",
       label: {
         en: ["Image"],
@@ -22,8 +20,8 @@ export default {
         {
           id: "https://db.dl.tlu.ee/iiif/canvas",
           type: "Canvas",
-          height: 1800,//replace with real values
-          width: 1200,//replace with real values
+          height: height,//replace with real values
+          width: width,//replace with real values
           items: [
             {
               id: "https://db.dl.tlu.ee/iiif/image/page",
@@ -34,22 +32,46 @@ export default {
                   type: "Annotation",
                   motivation: "painting",
                   body: {
-                    id: "https://db.dl.tlu.ee/assets/f1667609-2d01-4c5d-98ef-7e4f3127664d?format=jpg", //replace file ID with the real value and lets make sure it is JPG by using format=jpg
+                    id: `https://db.dl.tlu.ee/assets/${fileId}?format=jpg`, //replace file ID with the real value and lets make sure it is JPG by using format=jpg
                     type: "Image",
                     format: "image/jpeg",
-                    height: 1800, //replace with real values
-                    width: 1200,//replace with real values
+                    height: height, //replace with real values
+                    width: width,//replace with real values
                   },
                   target:
-                    "https://db.dl.tlu.ee/iiif/canvas",
+                      "https://db.dl.tlu.ee/iiif/canvas",
                 },
               ],
             },
           ],
         },
       ],
-    };
+    }
+)
+
+const getImgData = async (id) => (
+    axios.get(`https://db.dl.tlu.ee/files/${id}?fields=height,width`)
+        .then(function (response) {
+          return(response);
+        })
+        .catch(function (error) {
+          // handle error
+          console.log(error);
+        })
+
+)
+
+
+export default {
+  id: "iiif",
+  handler: (router) => {
     router.get("/", (req, res) => res.send("IIIF"));
-    router.get("/manifest/file/file_id", (req, res) => res.send(jsonObject));
+      router.get('/manifest/file/:file_id', async function(req, res) {
+        const fileId = req.params.file_id;
+        const image = await getImgData(fileId)
+        const imageData = image.data
+        res.send(createIifJson(fileId, imageData.height, imageData.width))
+      });
   },
 };
+
