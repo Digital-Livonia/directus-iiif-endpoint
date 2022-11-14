@@ -20,8 +20,8 @@ const createIifJson = (fileId, height, width) => (
         {
           id: "https://db.dl.tlu.ee/iiif/canvas",
           type: "Canvas",
-          height: height,//replace with real values
-          width: width,//replace with real values
+          height: `${height}`,//replace with real values
+          width: `${width}`,//replace with real values
           items: [
             {
               id: "https://db.dl.tlu.ee/iiif/image/page",
@@ -35,8 +35,8 @@ const createIifJson = (fileId, height, width) => (
                     id: `https://db.dl.tlu.ee/assets/${fileId}?format=jpg`, //replace file ID with the real value and lets make sure it is JPG by using format=jpg
                     type: "Image",
                     format: "image/jpeg",
-                    height: height, //replace with real values
-                    width: width,//replace with real values
+                    height: `${height}`, //replace with real values
+                    width: `${width}`,//replace with real values
                   },
                   target:
                       "https://db.dl.tlu.ee/iiif/canvas",
@@ -49,29 +49,18 @@ const createIifJson = (fileId, height, width) => (
     }
 )
 
-const getImgData = async (id) => (
-    axios.get(`https://db.dl.tlu.ee/files/${id}?fields=height,width`)
-        .then(function (response) {
-          return(response);
-        })
-        .catch(function (error) {
-          // handle error
-          console.log(error);
-        })
-
-)
-
-
 export default {
   id: "iiif",
   handler: (router) => {
     router.get("/", (req, res) => res.send("IIIF"));
-      router.get('/manifest/file/:file_id', async function(req, res) {
+      router.get('/manifest/file/:file_id/:file_height/:file_width', function(req, res) {
         const fileId = req.params.file_id;
-        const image = await getImgData(fileId)
-        const imageData = image.data
-        res.send(createIifJson(fileId, imageData.height, imageData.width))
+        const fileHeight = req.params.file_height;
+        const fileWidth = req.params.file_width
+        res.send(createIifJson(fileId, fileHeight, fileWidth));
       });
   },
 };
+
+
 
