@@ -8,7 +8,7 @@
 	],
 	"directus:extension": {
 		"type": "endpoint",
-		"path": "dist/index.js",
+		"path": "../extensions/endpoints/directus-iiif-endpoint/index.js",
 		"source": "src/index.js",
 		"host": "^9.20.4"
 	},
