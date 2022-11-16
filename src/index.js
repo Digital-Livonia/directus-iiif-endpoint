@@ -6,6 +6,10 @@
 //DOCS
 // https://docs.directus.io/extensions/endpoints.html
 // https://docs.directus.io/extensions/creating-extensions.html
+
+
+import { useApi } from '@directus/extensions-sdk';
+
 const axios = require('axios');
 const createIifJson = (fileId, height, width) => (
     {
@@ -50,6 +54,17 @@ const createIifJson = (fileId, height, width) => (
 )
 
 export default {
+  setup() {
+		const api = useApi();
+
+    //const { Directus } = require('@directus/sdk');
+
+    const directus = new api('http://directus.example.com');
+    
+    const real_estate = directus.items('real_estate');
+    console.log(real_estate);
+
+	},
   id: "iiif",
   handler: (router) => {
     router.get("/", (req, res) => res.send("IIIF"));
