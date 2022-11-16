@@ -7,11 +7,6 @@
 // https://docs.directus.io/extensions/creating-extensions.html
 
 
-const loadItem = async (fileId) => {
-    const api = useApi();
-    const item = await api.get(`/files/${fileId}?fields=width,height`);
-    return item;
-};
 const createIifJson = (fileId, height, width) => (
     {
         "@context": "http://iiif.io/api/presentation/3/context.json",
