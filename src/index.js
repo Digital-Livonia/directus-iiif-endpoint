@@ -6,8 +6,6 @@
 // https://docs.directus.io/extensions/endpoints.html
 // https://docs.directus.io/extensions/creating-extensions.html
 
-import { useApi } from "@directus/extensions-sdk";
-
 const axios = require("axios");
 const createIifJson = (fileId, height, width) => ({
   "@context": "http://iiif.io/api/presentation/3/context.json",
@@ -49,22 +47,9 @@ const createIifJson = (fileId, height, width) => ({
 });
 
 export default {
-  setup() {
-    const api = useApi();
-  },
+  
   id: "iiif",
   handler: (router) => {
-    const loadItem = async () => {
-      try {
-        const item = await api.get(
-          `/files/f1667609-2d01-4c5d-98ef-7e4f3127664d?fields=width`
-        );
-        pageContent.value = item.data.width;
-      } finally {
-        loading.value = false;
-      }
-    };
-    console.log(loadItem);
     router.get("/", (req, res) => res.send("IIIF"));
     router.get(
       "/manifest/file/:file_id/:file_height/:file_width",
