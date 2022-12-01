@@ -6,8 +6,45 @@
 // https://docs.directus.io/extensions/endpoints.html
 // https://docs.directus.io/extensions/creating-extensions.html
 
-
-const createIifJson = (fileId, height, width) => (
+const createIiifCollectionJson = (results) => {
+    const UUID = results.iiif_file;
+    const canvasLabel = results.iiif_canvas_label;
+    const collection = results.iiif_collection;
+    const metaData = results.iiif_meta
+    const metadataArray = metaData.map(item => ({
+        "label": [
+            item.Key
+        ],
+        "value": [
+            item.Value
+        ]
+    }))
+    return (
+        {
+            "@context": "http://iiif.io/api/presentation/3/context.json",
+            "id": `https://cms.rahvaroivad.ee/wp-json/iiif/manifest/${UUID}`,
+            "type": "Manifest",
+            "label": {
+                "et": [
+                    `${canvasLabel}`
+                ]
+            },
+            "items": [
+                {
+                    "type": "Canvas",
+                    "id": "http://iip.archaeovision.eu/canvas/1",
+                    "label": {
+                        "et": [
+                            `${canvasLabel}`
+                        ]
+                    },
+                    "metadata": metadataArray
+                }
+            ]
+        }
+    )
+}
+const createIiifSingleImageJson = (fileId, height, width) => (
     {
         "@context": "http://iiif.io/api/presentation/3/context.json",
         id: `https://db.dl.tlu.ee/iiif/manifest/file/${fileId}`, //replace <file_id> with the real value
@@ -64,12 +101,26 @@ export default {
             const fileId = req.params.file_id;
             fileService
                 .readOne(fileId, {fields: ["width", "height"]})
-                .then((results) => res.send(createIifJson(fileId, results.height, results.width)))
+                .then((results) => res.send(createIiifSingleImageJson(fileId, results.height, results.width)))
                 .catch((error) => {
                     return next(new ServiceUnavailableException(error.message));
                 });
 
         })
+        router.get('/manifest/:collection/:file_id', function (req, res, next) {
+            const fileId = req.params.file_id;
+             const fileService = new ItemsService("IIIF_settings", {
+                 schema: req.schema,
+                 accountability: req.accountability
+             });
+             fileService
+                 .readOne(fileId)
+                 .then((results) => res.send(createIiifCollectionJson(results)))
+                 .catch((error) => {
+                     return next(new ServiceUnavailableException(error.message));
+                 });
+
+         })
     }
 }
 
