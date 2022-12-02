@@ -55,17 +55,17 @@ const createIiifSingleImageJson = (fileId, height, width) => (
         rights: "http://creativecommons.org/licenses/by/4.0/",
         items: [
             {
-                id: "https://db.dl.tlu.ee/iiif/canvas",
+                id: "https://db.dl.tlu.ee/iiif/canvas/1",
                 type: "Canvas",
                 height: `${height}`,//replace with real values
                 width: `${width}`,//replace with real values
                 items: [
                     {
-                        id: "https://db.dl.tlu.ee/iiif/image/page",
+                        id: "https://db.dl.tlu.ee/iiif/image/page/1",
                         type: "AnnotationPage",
                         items: [
                             {
-                                id: "https://db.dl.tlu.ee/iiif/image",
+                                id: "https://db.dl.tlu.ee/iiif/image/1",
                                 type: "Annotation",
                                 motivation: "painting",
                                 body: {
@@ -76,7 +76,35 @@ const createIiifSingleImageJson = (fileId, height, width) => (
                                     width: `${width}`,//replace with real values
                                 },
                                 target:
-                                    "https://db.dl.tlu.ee/iiif/canvas",
+                                    "https://db.dl.tlu.ee/iiif/canvas/1",
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                id: "https://db.dl.tlu.ee/iiif/canvas/2",
+                type: "Canvas",
+                height: `${height}`,//replace with real values
+                width: `${width}`,//replace with real values
+                items: [
+                    {
+                        id: "https://db.dl.tlu.ee/iiif/image/page/2",
+                        type: "AnnotationPage",
+                        items: [
+                            {
+                                id: "https://db.dl.tlu.ee/iiif/image/2",
+                                type: "Annotation",
+                                motivation: "painting",
+                                body: {
+                                    id: `https://db.dl.tlu.ee/assets/${fileId}?format=jpg`, //replace file ID with the real value and lets make sure it is JPG by using format=jpg
+                                    type: "Image",
+                                    format: "image/jpeg",
+                                    height: `${height}`, //replace with real values
+                                    width: `${width}`,//replace with real values
+                                },
+                                target:
+                                    "https://db.dl.tlu.ee/iiif/canvas/2",
                             },
                         ],
                     },
@@ -123,4 +151,3 @@ export default {
          })
     }
 }
-
