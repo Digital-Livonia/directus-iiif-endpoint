@@ -46,7 +46,7 @@ const createIiifCollectionJson = (canvasLabel, items, UUID) => {
     return (
         {
             "@context": "http://iiif.io/api/presentation/3/context.json",
-            "id": `https://cms.rahvaroivad.ee/wp-json/iiif/manifest/${UUID}`,
+            "id": `https://db.dl.tlu.ee/iiif/manifest/file/${UUID}`,
             "type": "Manifest",
             "label": {
                 "et": [
