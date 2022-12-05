@@ -40,8 +40,7 @@ const createIiifCollectionJson = (
   canvasLabel,
   items,
   collection,
-  fileId,
-  itemMeta
+  fileId
 ) => {
   return {
     "@context": "http://iiif.io/api/presentation/3/context.json",
@@ -50,7 +49,17 @@ const createIiifCollectionJson = (
     label: {
       et: [`${canvasLabel}`],
     },
-    metadata: [itemMeta],
+    /* Siin näide kuidas peab tulema
+    metadata: [
+      {
+        label: ["Reference"],
+        value: ["EAA.2069.2.290"],
+      },
+      {
+        label: ["Title"],
+        value: ["Piiiik pealkiri"],
+      },
+    ],*/
     items: items,
   };
 };
@@ -138,13 +147,12 @@ export default {
         const fieldSettings = await itemServiceSetting.readByQuery({
           filter: { iiif_collection: { _eq: collection } },
         });
-        const { iiif_file, iiif_canvas_label, iiif_meta } = fieldSettings[0];
+        const { iiif_file, iiif_canvas_label } = fieldSettings[0];
         const collectionData = await itemServiceCollection.readOne(fileId, {
           fields: [`${iiif_file}.*`, iiif_canvas_label],
         });
         const imageArray = collectionData[iiif_file];
         const canvasLabel = collectionData[iiif_canvas_label];
-        const itemMeta = collectionData[iiif_meta];
         const imageDataArray = [];
         await Promise.all(
           imageArray.map(async (item) => {
@@ -161,8 +169,7 @@ export default {
             canvasLabel,
             items,
             collection,
-            fileId,
-            itemMeta
+            fileId
           )
         );
       }
