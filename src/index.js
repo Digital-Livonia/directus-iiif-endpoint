@@ -42,11 +42,11 @@ const createItemArray = (results) => {
        items
     )
 }
-const createIiifCollectionJson = (canvasLabel, items, UUID, collection) => {
+const createIiifCollectionJson = (canvasLabel, items, collection, fileId) => {
     return (
         {
             "@context": "http://iiif.io/api/presentation/3/context.json",
-            "id": `https://db.dl.tlu.ee/iiif/manifest/${collection}/${UUID}`,
+            "id": `https://db.dl.tlu.ee/iiif/manifest/${collection}/${fileId}`,
             "type": "Manifest",
             "label": {
                 "et": [
@@ -149,7 +149,7 @@ export default {
                 imageDataArray.push(imageData)
             }));
             const items = createItemArray(imageDataArray);
-            res.send(createIiifCollectionJson(canvasLabel, items, imageArray[0].directus_files_id, collection))
+            res.send(createIiifCollectionJson(canvasLabel, items, collection, fileId ))
          })
     }
 }
