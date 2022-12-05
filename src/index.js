@@ -53,7 +53,7 @@ const createIiifCollectionJson = (canvasLabel, items, collection, fileId) => {
                     `${canvasLabel}`
                 ]
             },
-            "items": [items]
+            "items": items
         }
     )
 }
