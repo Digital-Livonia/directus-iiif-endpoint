@@ -42,11 +42,11 @@ const createItemArray = (results) => {
        items
     )
 }
-const createIiifCollectionJson = (canvasLabel, items, UUID) => {
+const createIiifCollectionJson = (canvasLabel, items, UUID, collection) => {
     return (
         {
             "@context": "http://iiif.io/api/presentation/3/context.json",
-            "id": `https://db.dl.tlu.ee/iiif/manifest/file/${UUID}`,
+            "id": `https://db.dl.tlu.ee/iiif/manifest/${collection}/${UUID}`,
             "type": "Manifest",
             "label": {
                 "et": [
@@ -94,35 +94,7 @@ const createIiifSingleImageJson = (fileId, height, width) => (
                         ],
                     },
                 ],
-            },
-            {
-                id: "https://db.dl.tlu.ee/iiif/canvas/2",
-                type: "Canvas",
-                height: `${height}`,//replace with real values
-                width: `${width}`,//replace with real values
-                items: [
-                    {
-                        id: "https://db.dl.tlu.ee/iiif/image/page/2",
-                        type: "AnnotationPage",
-                        items: [
-                            {
-                                id: "https://db.dl.tlu.ee/iiif/image/2",
-                                type: "Annotation",
-                                motivation: "painting",
-                                body: {
-                                    id: `https://db.dl.tlu.ee/assets/${fileId}?format=jpg`, //replace file ID with the real value and lets make sure it is JPG by using format=jpg
-                                    type: "Image",
-                                    format: "image/jpeg",
-                                    height: `${height}`, //replace with real values
-                                    width: `${width}`,//replace with real values
-                                },
-                                target:
-                                    "https://db.dl.tlu.ee/iiif/canvas/2",
-                            },
-                        ],
-                    },
-                ],
-            },
+            }
         ],
     }
 )
@@ -177,7 +149,7 @@ export default {
                 imageDataArray.push(imageData)
             }));
             const items = createItemArray(imageDataArray);
-            res.send(createIiifCollectionJson(canvasLabel, items, imageArray[0].directus_files_id))
+            res.send(createIiifCollectionJson(canvasLabel, items, imageArray[0].directus_files_id, collection))
          })
     }
 }
