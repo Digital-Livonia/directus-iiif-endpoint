@@ -138,7 +138,7 @@ export default {
         const fieldSettings = await itemServiceSetting.readByQuery({
           filter: { iiif_collection: { _eq: collection } },
         });
-        const { iiif_file, iiif_canvas_label } = fieldSettings[0];
+        const { iiif_file, iiif_canvas_label, iiif_meta } = fieldSettings[0];
         const collectionData = await itemServiceCollection.readOne(fileId, {
           fields: [`${iiif_file}.*`, iiif_canvas_label],
         });
