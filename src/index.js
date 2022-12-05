@@ -49,17 +49,17 @@ const createIiifCollectionJson = (
     label: {
       et: [`${canvasLabel}`],
     },
-    /* Siin näide kuidas peab tulema
+    /* Siin näide kuidas peab tulema */
     metadata: [
       {
         label: ["Reference"],
-        value: ["EAA.2069.2.290"],
+        value: ["Reference number"],
       },
       {
         label: ["Title"],
         value: ["Piiiik pealkiri"],
       },
-    ],*/
+    ],
     items: items,
   };
 };
