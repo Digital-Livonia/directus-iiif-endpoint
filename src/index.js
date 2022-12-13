@@ -40,8 +40,10 @@ const createIiifCollectionJson = (
   canvasLabel,
   items,
   collection,
-  fileId
+  fileId,
+  iiifMeta
 ) => {
+  console.log(iiifMeta);
   return {
     "@context": "http://iiif.io/api/presentation/3/context.json",
     id: `https://db.dl.tlu.ee/iiif/manifest/${collection}/${fileId}`,
@@ -131,6 +133,7 @@ export default {
       async function (req, res, next) {
         const fileId = req.params.file_id;
         const collection = req.params.collection;
+      
         const itemServiceSetting = new ItemsService("IIIF_settings", {
           schema: req.schema,
           accountability: req.accountability,
@@ -147,12 +150,13 @@ export default {
         const fieldSettings = await itemServiceSetting.readByQuery({
           filter: { iiif_collection: { _eq: collection } },
         });
-        const { iiif_file, iiif_canvas_label } = fieldSettings[0];
+        const { iiif_file, iiif_canvas_label, iiif_meta } = fieldSettings[0];
         const collectionData = await itemServiceCollection.readOne(fileId, {
-          fields: [`${iiif_file}.*`, iiif_canvas_label],
+          fields: [`${iiif_file}.*`, iiif_canvas_label, iiif_meta],
         });
         const imageArray = collectionData[iiif_file];
         const canvasLabel = collectionData[iiif_canvas_label];
+        const iiifMeta = collectionData[iiif_meta];
         const imageDataArray = [];
         await Promise.all(
           imageArray.map(async (item) => {
@@ -169,7 +173,8 @@ export default {
             canvasLabel,
             items,
             collection,
-            fileId
+            fileId,
+            iiifMeta
           )
         );
       }
