@@ -43,7 +43,12 @@ const createIiifCollectionJson = (
   fileId,
   iiifMeta
 ) => {
-  console.log(iiifMeta);
+  
+  const iiifMetaItems = iiifMeta.map((item) => ({
+    label: [`${item[0]}`],
+    value: [`${item[1]}`],
+  }));
+
   return {
     "@context": "http://iiif.io/api/presentation/3/context.json",
     id: `https://db.dl.tlu.ee/iiif/manifest/${collection}/${fileId}`,
@@ -51,17 +56,7 @@ const createIiifCollectionJson = (
     label: {
       et: [`${canvasLabel}`],
     },
-    /* Siin näide kuidas peab tulema */
-    metadata: [
-      {
-        label: ["Reference"],
-        value: ["Reference number"],
-      },
-      {
-        label: ["Title"],
-        value: ["Piiiik pealkiri"],
-      },
-    ],
+    metadata: iiifMetaItems,
     items: items,
   };
 };
@@ -133,7 +128,7 @@ export default {
       async function (req, res, next) {
         const fileId = req.params.file_id;
         const collection = req.params.collection;
-      
+
         const itemServiceSetting = new ItemsService("IIIF_settings", {
           schema: req.schema,
           accountability: req.accountability,
@@ -151,12 +146,16 @@ export default {
           filter: { iiif_collection: { _eq: collection } },
         });
         const { iiif_file, iiif_canvas_label, iiif_meta } = fieldSettings[0];
+
+        const collectionDataFields = [`${iiif_file}.*`, iiif_canvas_label];
+        // let's add fields from the user defined configuration
+        iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`));
         const collectionData = await itemServiceCollection.readOne(fileId, {
-          fields: [`${iiif_file}.*`, iiif_canvas_label, iiif_meta],
+          fields: collectionDataFields,
         });
         const imageArray = collectionData[iiif_file];
         const canvasLabel = collectionData[iiif_canvas_label];
-        const iiifMeta = collectionData[iiif_meta];
+
         const imageDataArray = [];
         await Promise.all(
           imageArray.map(async (item) => {
@@ -168,13 +167,21 @@ export default {
           })
         );
         const items = createItemArray(imageDataArray);
+
+        const iiifMetaItems = iiif_meta.map((item) => {
+          const iiifMetaArray = [];
+          iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`]);
+          return iiifMetaArray;
+        });
+        console.log(iiifMetaItems, "iiifMetaItems");
+
         res.send(
           createIiifCollectionJson(
             canvasLabel,
             items,
             collection,
             fileId,
-            iiifMeta
+            iiifMetaItems
           )
         );
       }

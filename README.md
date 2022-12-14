@@ -4,9 +4,13 @@ This is work in progress. Currently extension extension adds [IIIF presentation 
 
 URL structure:
 - example.org/iiif/manifest/file/<directus-UUID> - returnes simple presentation API 
+- example.org/iiif/manifest/:collection/:id - returns the collection item
 
-Example presentaion API output: 
-- https://db.dl.tlu.ee/iiif/manifest/file/file_id (this extenison)
-- https://cms.rahvaroivad.ee/wp-json/iiif/manifest/4084 (WordPress extension)
+Requirements:
+- Currently extension relies on IIIF_settings table where configuration for collections is set
+  
+TODO: 
+- Document IIIF_settings table
+- Auto generate IIIF_settings table during installations
 
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
