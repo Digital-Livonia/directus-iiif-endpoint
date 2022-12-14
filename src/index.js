@@ -173,7 +173,6 @@ export default {
           iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`]);
           return iiifMetaArray;
         });
-        console.log(iiifMetaItems, "iiifMetaItems");
 
         res.send(
           createIiifCollectionJson(
