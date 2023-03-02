@@ -6,9 +6,13 @@
 // https://docs.directus.io/extensions/endpoints.html
 // https://docs.directus.io/extensions/creating-extensions.html
 
+
 const createItemArray = (results) => {
+
   const items = results.map((item, index) => ({
     id: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
+      all: `${item.title}`,
+      filename: `${item.filename_download}`,
     type: "Canvas",
     height: `${item.height}`, //replace with real values
     width: `${item.width}`, //replace with real values
@@ -36,12 +40,15 @@ const createItemArray = (results) => {
   }));
   return items;
 };
+
+
 const createIiifCollectionJson = (
   canvasLabel,
   items,
   collection,
   fileId,
-  iiifMeta
+  iiifMeta,
+  sorted
 ) => {
   
   const iiifMetaItems = iiifMeta.map((item) => ({
@@ -49,8 +56,11 @@ const createIiifCollectionJson = (
     value: [`${item[1]}`],
   }));
 
+
   return {
     "@context": "http://iiif.io/api/presentation/3/context.json",
+      sorted: sorted,
+      sorted2: "toimin",
     id: `https://db.dl.tlu.ee/iiif/manifest/${collection}/${fileId}`,
     type: "Manifest",
     label: {
@@ -161,26 +171,30 @@ export default {
           imageArray.map(async (item) => {
             const imageData = await itemServiceFiles.readOne(
               item.directus_files_id,
-              { fields: ["id", "width", "height"] }
+              { fields: ["id", "width", "height", "title", "filename_download"] }
             );
             imageDataArray.push(imageData);
           })
         );
-        const items = createItemArray(imageDataArray);
+
 
         const iiifMetaItems = iiif_meta.map((item) => {
           const iiifMetaArray = [];
           iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`]);
           return iiifMetaArray;
         });
+        const sorted = imageDataArray.sort((a, b) => (a.title > b.title) ? 1 : -1);
+       const items = createItemArray(sorted);
 
         res.send(
+
           createIiifCollectionJson(
             canvasLabel,
             items,
             collection,
             fileId,
-            iiifMetaItems
+            iiifMetaItems,
+
           )
         );
       }
