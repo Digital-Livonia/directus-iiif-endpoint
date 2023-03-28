@@ -4,7 +4,7 @@
 
 const prepAuthor = (value) =>
   value
-    ? { label: { et: ["Fotograaf"], en: ["Photpgrapher"] }, "value": value }
+    ? [{ label: { et: ["Fotograaf"], en: ["Photpgrapher"] }, "value": value }]
     : "";
 const createItemArray = (results) => {
   const items = results.map((item, index) => ({
@@ -14,7 +14,7 @@ const createItemArray = (results) => {
     type: "Canvas",
     height: `${item.height}`,
     width: `${item.width}`,
-    metadata: [prepAuthor(item.author)],
+    metadata: prepAuthor(item.author),
     items: [
       {
         id: `https://db.dl.tlu.ee/iiif/image/page/${index + 1}`,
