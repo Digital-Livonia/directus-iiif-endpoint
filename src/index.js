@@ -2,6 +2,10 @@
 // selle järgi pärida faili mõõtmed directus_files tabelist ning asendada height ja width väärtused
 // kas api väljund cachetakse kuidagi? tegelit poleks vaja ju uusi päringuid teha alati ...
 
+const prepAuthor = (value) =>
+  value
+    ? { label: { et: ["Fotograaf"], en: ["Photpgrapher"] }, "value": value }
+    : "";
 const createItemArray = (results) => {
   const items = results.map((item, index) => ({
     id: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
@@ -10,6 +14,7 @@ const createItemArray = (results) => {
     type: "Canvas",
     height: `${item.height}`,
     width: `${item.width}`,
+    metadata: [prepAuthor(item.author)],
     items: [
       {
         id: `https://db.dl.tlu.ee/iiif/image/page/${index + 1}`,
@@ -51,7 +56,6 @@ const createIiifCollectionJson = (
   return {
     "@context": "http://iiif.io/api/presentation/3/context.json",
     sorted: sorted,
-    sorted2: "toimin",
     id: `https://db.dl.tlu.ee/iiif/manifest/${collection}/${fileId}`,
     type: "Manifest",
     label: {
@@ -148,12 +152,7 @@ export default {
         });
         const { iiif_file, iiif_canvas_label, iiif_meta } = fieldSettings[0];
 
-        const collectionDataFields = [
-          `${iiif_file}.*`,
-          `${iiif_file}.directus_files_id.author`,
-          `${iiif_file}.directus_files_id.date`,
-          iiif_canvas_label,
-        ];
+        const collectionDataFields = [`${iiif_file}.*`, iiif_canvas_label];
         // let's add fields from the user defined configuration
         iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`));
         const collectionData = await itemServiceCollection.readOne(fileId, {
@@ -168,7 +167,15 @@ export default {
             const imageData = await itemServiceFiles.readOne(
               item.directus_files_id,
               {
-                fields: ["id", "width", "height", "title", "filename_download"],
+                fields: [
+                  "id",
+                  "width",
+                  "height",
+                  "title",
+                  "filename_download",
+                  "author",
+                  "date",
+                ],
               }
             );
             imageDataArray.push(imageData);

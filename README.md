@@ -17,4 +17,4 @@ There has been some discussion about the IIIF support for Directus: https://gith
 
 ## Versions
 ### 1.0.1
-- Support for asset author and date added: <file_field>.directus_files_id.author, <file_field>.directus_files_id.date
+- Support for asset author
