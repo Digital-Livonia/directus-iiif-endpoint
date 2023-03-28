@@ -2,20 +2,14 @@
 // selle järgi pärida faili mõõtmed directus_files tabelist ning asendada height ja width väärtused
 // kas api väljund cachetakse kuidagi? tegelit poleks vaja ju uusi päringuid teha alati ...
 
-//DOCS
-// https://docs.directus.io/extensions/endpoints.html
-// https://docs.directus.io/extensions/creating-extensions.html
-
-
 const createItemArray = (results) => {
-
   const items = results.map((item, index) => ({
     id: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
-      all: `${item.title}`,
-      filename: `${item.filename_download}`,
+    all: `${item.title}`,
+    filename: `${item.filename_download}`,
     type: "Canvas",
-    height: `${item.height}`, //replace with real values
-    width: `${item.width}`, //replace with real values
+    height: `${item.height}`,
+    width: `${item.width}`,
     items: [
       {
         id: `https://db.dl.tlu.ee/iiif/image/page/${index + 1}`,
@@ -26,11 +20,11 @@ const createItemArray = (results) => {
             type: "Annotation",
             motivation: "painting",
             body: {
-              id: `https://db.dl.tlu.ee/assets/${item.id}?format=jpg`, //replace file ID with the real value and lets make sure it is JPG by using format=jpg
+              id: `https://db.dl.tlu.ee/assets/${item.id}?format=jpg`, //lets make sure it is JPG by using format=jpg
               type: "Image",
               format: "image/jpeg",
-              height: `${item.height}`, //replace with real values
-              width: `${item.width}`, //replace with real values
+              height: `${item.height}`,
+              width: `${item.width}`,
             },
             target: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
           },
@@ -41,7 +35,6 @@ const createItemArray = (results) => {
   return items;
 };
 
-
 const createIiifCollectionJson = (
   canvasLabel,
   items,
@@ -50,17 +43,15 @@ const createIiifCollectionJson = (
   iiifMeta,
   sorted
 ) => {
-  
   const iiifMetaItems = iiifMeta.map((item) => ({
     label: [`${item[0]}`],
     value: [`${item[1]}`],
   }));
 
-
   return {
     "@context": "http://iiif.io/api/presentation/3/context.json",
-      sorted: sorted,
-      sorted2: "toimin",
+    sorted: sorted,
+    sorted2: "toimin",
     id: `https://db.dl.tlu.ee/iiif/manifest/${collection}/${fileId}`,
     type: "Manifest",
     label: {
@@ -72,7 +63,7 @@ const createIiifCollectionJson = (
 };
 const createIiifSingleImageJson = (fileId, height, width) => ({
   "@context": "http://iiif.io/api/presentation/3/context.json",
-  id: `https://db.dl.tlu.ee/iiif/manifest/file/${fileId}`, //replace <file_id> with the real value
+  id: `https://db.dl.tlu.ee/iiif/manifest/file/${fileId}`,
   type: "Manifest",
   label: {
     en: ["Image"],
@@ -82,8 +73,8 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
     {
       id: "https://db.dl.tlu.ee/iiif/canvas/1",
       type: "Canvas",
-      height: `${height}`, //replace with real values
-      width: `${width}`, //replace with real values
+      height: `${height}`,
+      width: `${width}`,
       items: [
         {
           id: "https://db.dl.tlu.ee/iiif/image/page/1",
@@ -94,11 +85,11 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
               type: "Annotation",
               motivation: "painting",
               body: {
-                id: `https://db.dl.tlu.ee/assets/${fileId}?format=jpg`, //replace file ID with the real value and lets make sure it is JPG by using format=jpg
+                id: `https://db.dl.tlu.ee/assets/${fileId}?format=jpg`, //lets make sure it is JPG by using format=jpg
                 type: "Image",
                 format: "image/jpeg",
-                height: `${height}`, //replace with real values
-                width: `${width}`, //replace with real values
+                height: `${height}`,
+                width: `${width}`,
               },
               target: "https://db.dl.tlu.ee/iiif/canvas/1",
             },
@@ -157,7 +148,12 @@ export default {
         });
         const { iiif_file, iiif_canvas_label, iiif_meta } = fieldSettings[0];
 
-        const collectionDataFields = [`${iiif_file}.*`, iiif_canvas_label];
+        const collectionDataFields = [
+          `${iiif_file}.*`,
+          `${iiif_file}.directus_files_id.author`,
+          `${iiif_file}.directus_files_id.date`,
+          iiif_canvas_label,
+        ];
         // let's add fields from the user defined configuration
         iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`));
         const collectionData = await itemServiceCollection.readOne(fileId, {
@@ -171,30 +167,31 @@ export default {
           imageArray.map(async (item) => {
             const imageData = await itemServiceFiles.readOne(
               item.directus_files_id,
-              { fields: ["id", "width", "height", "title", "filename_download"] }
+              {
+                fields: ["id", "width", "height", "title", "filename_download"],
+              }
             );
             imageDataArray.push(imageData);
           })
         );
-
 
         const iiifMetaItems = iiif_meta.map((item) => {
           const iiifMetaArray = [];
           iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`]);
           return iiifMetaArray;
         });
-        const sorted = imageDataArray.sort((a, b) => (a.title > b.title) ? 1 : -1);
-       const items = createItemArray(sorted);
+        const sorted = imageDataArray.sort((a, b) =>
+          a.title > b.title ? 1 : -1
+        );
+        const items = createItemArray(sorted);
 
         res.send(
-
           createIiifCollectionJson(
             canvasLabel,
             items,
             collection,
             fileId,
-            iiifMetaItems,
-
+            iiifMetaItems
           )
         );
       }
