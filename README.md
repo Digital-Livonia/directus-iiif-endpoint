@@ -18,5 +18,3 @@ There has been some discussion about the IIIF support for Directus: https://gith
 ## Versions
 ### 1.0.1
 - Support for asset author
-### 1.0.2
-- Directus 10.4 related update - error reporting
