@@ -117,7 +117,7 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
 
 export default {
   id: "iiif",
-  handler: (router, { services, exceptions }) => {
+  handler: (router, { services }) => {
     const { ItemsService } = services;
     const { ServiceUnavailableException } = createError('ServiceUnavailableException', 'Service Unavailable');
 	
