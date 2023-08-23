@@ -1,6 +1,7 @@
 {
 	"name": "directus-extension-directus-iiif-endpoint",
 	"version": "1.0.1",
+	"type":"module",
 	"keywords": [
 		"directus",
 		"directus-extension",

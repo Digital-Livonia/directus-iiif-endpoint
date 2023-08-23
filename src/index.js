@@ -2,6 +2,8 @@
 // selle järgi pärida faili mõõtmed directus_files tabelist ning asendada height ja width väärtused
 // kas api väljund cachetakse kuidagi? tegelit poleks vaja ju uusi päringuid teha alati ...
 
+import { createError } from '@directus/errors';
+
 const prepAuthor = (value) =>
   value
     ? [{ label: { et: ["Fotograaf"], en: ["Photpgrapher"] }, "value": value }]
@@ -117,8 +119,8 @@ export default {
   id: "iiif",
   handler: (router, { services, exceptions }) => {
     const { ItemsService } = services;
-    const { ServiceUnavailableException } = exceptions;
-
+    const { ServiceUnavailableException } = createError('ServiceUnavailableException', 'Service Unavailable');
+	
     router.get("/", (req, res) => res.send("IIIF"));
     router.get("/manifest/file/:file_id", function (req, res, next) {
       const fileService = new ItemsService("directus_files", {
