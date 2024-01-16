@@ -81,11 +81,6 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
   label: {
     en: ["Image"],
   },
-  service: {
-    id: "https://web.chgov.bar.admin.ch/iiif/search/manifest/32316311",
-    profile: "http://iiif.io/api/search/1/search",
-    type: "SearchService1"
-  },
   rights: "http://creativecommons.org/licenses/by/4.0/",
   items: [
     {
@@ -113,34 +108,6 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
             },
           ],
         },
-      ],
-      annotations: [
-        {
-          id: `https://db.dl.tlu.ee/iiif/manifest/file/${fileId}#annotations-content-supplementing-32316311-0`,
-          type: "AnnotationPage",
-          items: [
-            {
-              "@context": "http://iiif.io/api/presentation/3/context.json",
-              id: `https://db.dl.tlu.ee/iiif/manifest/file/${fileId}#annotations-content-supplementing-32316311-0`,
-              "type": "Annotation",
-              "motivation": "supplementing",
-              "target": "https://api.chgov.bar.admin.ch/manifests/32316311/canvasses/32316311-0",
-              "body": {
-                "id": "https://api.chgov.bar.admin.ch/ocr/32316311/hocr/32316311-0.hocr",
-                "type": "Text",
-                "format": "text/vnd.hocr+html"
-              }
-            }
-          ]
-        }
-      ],
-      seeAlso: [
-        {
-          id: "https://api.chgov.bar.admin.ch/ocr/32316311/hocr/32316311-0.hocr",
-          type: "Text",
-          format: "text/vnd.hocr+html",
-          profile: "http://kba.cloud/hocr-spec/1.2/"
-        }
       ],
     },
   ],
