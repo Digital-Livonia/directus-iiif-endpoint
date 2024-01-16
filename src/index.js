@@ -109,13 +109,32 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
           ],
         },
       ],
+      annotations: [
+        {
+          id: "https://api.chgov.bar.admin.ch/manifests/32316311/32316311.json#annotations-page-supplementing-32316311-0",
+          type: "AnnotationPage",
+          items: [
+            {
+              "@context": "http://iiif.io/api/presentation/3/context.json",
+              "id": "https://api.chgov.bar.admin.ch/manifests/32316311/32316311.json#annotations-content-supplementing-32316311-0",
+              "type": "Annotation",
+              "motivation": "supplementing",
+              "target": "https://api.chgov.bar.admin.ch/manifests/32316311/canvasses/32316311-0",
+              "body": {
+                "id": "https://api.chgov.bar.admin.ch/ocr/32316311/hocr/32316311-0.hocr",
+                "type": "Text",
+                "format": "text/vnd.hocr+html"
+              }
+            }
+          ]
+        }
+      ],
       seeAlso: [
         {
-          id: "https://stacks.stanford.edu/file/fg165hz3589/fg165hz3589_3.xml",
-          type: "Dataset",
-          label: { "none": ["OCR text"] },
-          format: "application/xml",
-          profile: "http://www.loc.gov/standards/alto/ns-v2#"
+          id: "https://api.chgov.bar.admin.ch/ocr/32316311/hocr/32316311-0.hocr",
+          type: "Text",
+          format: "text/vnd.hocr+html",
+          profile: "http://kba.cloud/hocr-spec/1.2/"
         }
       ],
     },
