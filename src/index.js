@@ -81,6 +81,11 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
   label: {
     en: ["Image"],
   },
+  service: {
+    id: "https://web.chgov.bar.admin.ch/iiif/search/manifest/32316311",
+    profile: "http://iiif.io/api/search/1/search",
+    type: "SearchService1"
+  },
   rights: "http://creativecommons.org/licenses/by/4.0/",
   items: [
     {
