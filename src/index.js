@@ -109,6 +109,14 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
           ],
         },
       ],
+      seeAlso: [
+        {
+          id: "https://stacks.stanford.edu/file/fg165hz3589/fg165hz3589_3.xml",
+          label: "OCR text",
+          format: "application/xml",
+          profile: "http://www.loc.gov/standards/alto/ns-v2#"
+        }
+      ],
     },
   ],
 });
