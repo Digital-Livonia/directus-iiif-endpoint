@@ -111,12 +111,12 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
       ],
       annotations: [
         {
-          id: "https://api.chgov.bar.admin.ch/manifests/32316311/32316311.json#annotations-page-supplementing-32316311-0",
+          id: `https://db.dl.tlu.ee/iiif/manifest/file/${fileId}#annotations-content-supplementing-32316311-0`,
           type: "AnnotationPage",
           items: [
             {
               "@context": "http://iiif.io/api/presentation/3/context.json",
-              "id": "https://api.chgov.bar.admin.ch/manifests/32316311/32316311.json#annotations-content-supplementing-32316311-0",
+              id: `https://db.dl.tlu.ee/iiif/manifest/file/${fileId}#annotations-content-supplementing-32316311-0`,
               "type": "Annotation",
               "motivation": "supplementing",
               "target": "https://api.chgov.bar.admin.ch/manifests/32316311/canvasses/32316311-0",
