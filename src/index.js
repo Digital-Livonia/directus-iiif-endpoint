@@ -17,11 +17,11 @@ const createItemArray = (results) => {
     metadata: prepAuthor(item.author),
     thumbnail: [
       {
-        id: `https://db.dl.tlu.ee/assets/${item.id}?format=jpg`,
+        id: `https://db.dl.tlu.ee/assets/${item.id}?key=thumbnail`,
         type: "Image",
         format: "image/png",
-        width: 640,
-        height: 360
+        width: `${thumbWidth}`,
+        height: `${(thumbWidth * item.height) / item.width}`,
       }
     ],
     items: [
