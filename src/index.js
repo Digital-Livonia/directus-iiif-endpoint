@@ -4,9 +4,10 @@
 
 const prepAuthor = (value) =>
   value
-    ? [{ label: { et: ["Fotograaf"], en: ["Photpgrapher"] }, "value": value }]
+    ? [{ label: { et: ["Fotograaf"], en: ["Photpgrapher"] }, value: value }]
     : "";
 const createItemArray = (results) => {
+  const thumbWidth = 100;
   const items = results.map((item, index) => ({
     id: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
     all: `${item.title}`,
@@ -21,8 +22,8 @@ const createItemArray = (results) => {
         type: "Image",
         format: "image/png",
         width: `${thumbWidth}`,
-        height: `${(thumbWidth * item.height) / item.width}`,
-      }
+        height: `${Math.round((thumbWidth * item.height) / item.width)}`,
+      },
     ],
     items: [
       {
