@@ -48,7 +48,7 @@ const createItemArray = (results) => {
     ],
     annotations: [
       {
-        id: "https://db.dl.tlu.ee/assets/783d563b-a096-42a8-ab09-36e991cac890.json",
+        id: `https://db.dl.tlu.ee/assets/783d563b-a096-42a8-ab09-36e991cac890.json#${index + 1}`,
         type: "AnnotationPage",
       },
     ],
