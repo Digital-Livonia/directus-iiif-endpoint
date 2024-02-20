@@ -166,9 +166,9 @@ export default {
         const fieldSettings = await itemServiceSetting.readByQuery({
           filter: { iiif_collection: { _eq: collection } },
         });
-        const { iiif_file, iiif_canvas_label, iiif_meta } = fieldSettings[0];
+        const { iiif_file, iiif_canvas_label, iiif_meta, annotations, alto_files } = fieldSettings[0];
 
-        const collectionDataFields = [`${iiif_file}.*`, iiif_canvas_label];
+        const collectionDataFields = [`${iiif_file}.*`, iiif_canvas_label, `${annotations}.*`, `${alto_files}.*`];
         // let's add fields from the user defined configuration
         iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`));
         const collectionData = await itemServiceCollection.readOne(fileId, {
