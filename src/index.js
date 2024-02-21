@@ -15,6 +15,18 @@ function findIdByTitle(annotations, title) {
   return annotation ? annotation.id : null;
 }
 
+function getAnnotations(annotations, title) {
+  if (annotations.length > 0) {
+    return {
+      id: `https://db.dl.tlu.ee/assets/${findIdByTitle(
+        annotations,
+        title
+      )}.json`,
+      type: "AnnotationPage",
+    };
+  } else return {} ;
+}
+
 const createItemArray = (results, annotations) => {
   const thumbWidth = 100;
   const items = results.map((item, index) => ({
@@ -55,15 +67,7 @@ const createItemArray = (results, annotations) => {
         ],
       },
     ],
-    annotations: [
-      {
-        id: `https://db.dl.tlu.ee/assets/${findIdByTitle(
-          annotations,
-          item.title
-        )}.json`,
-        type: "AnnotationPage",
-      },
-    ],
+    annotations: [getAnnotations(annotations, item.title)],
   }));
   return items;
 };
