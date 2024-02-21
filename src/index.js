@@ -6,7 +6,16 @@ const prepAuthor = (value) =>
   value
     ? [{ label: { et: ["Fotograaf"], en: ["Photpgrapher"] }, value: value }]
     : "";
-const createItemArray = (results) => {
+
+// Function to find ID by title
+function findIdByTitle(annotations, title) {
+  const annotation = annotations.find(
+    (annotation) => annotation.title === title
+  );
+  return annotation ? annotation.id : null;
+}
+
+const createItemArray = (results, annotations) => {
   const thumbWidth = 100;
   const items = results.map((item, index) => ({
     id: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
@@ -48,7 +57,10 @@ const createItemArray = (results) => {
     ],
     annotations: [
       {
-        id: `https://db.dl.tlu.ee/assets/${item.id}.json#${index + 1}`,
+        id: `https://db.dl.tlu.ee/assets/${findIdByTitle(
+          annotations,
+          item.title
+        )}.json`,
         type: "AnnotationPage",
       },
     ],
@@ -166,9 +178,20 @@ export default {
         const fieldSettings = await itemServiceSetting.readByQuery({
           filter: { iiif_collection: { _eq: collection } },
         });
-        const { iiif_file, iiif_canvas_label, iiif_meta, annotations, alto_files } = fieldSettings[0];
+        const {
+          iiif_file,
+          iiif_canvas_label,
+          iiif_meta,
+          annotation_files,
+          alto_files,
+        } = fieldSettings[0];
 
-        const collectionDataFields = [`${iiif_file}.*`, iiif_canvas_label, `${annotations}.*`, `${alto_files}.*`];
+        const collectionDataFields = [
+          `${iiif_file}.*`,
+          iiif_canvas_label,
+          `${annotation_files}.*`,
+          `${alto_files}.*`,
+        ];
         // let's add fields from the user defined configuration
         iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`));
         const collectionData = await itemServiceCollection.readOne(fileId, {
@@ -178,11 +201,16 @@ export default {
             [iiif_file]: {
               _limit: -1,
             },
+            [annotation_files]: {
+              _limit: -1,
+            },
           },
         });
         const imageArray = collectionData[iiif_file];
+        const annotationArray = collectionData[`${annotation_files}`];
         const canvasLabel = collectionData[iiif_canvas_label];
         const imageDataArray = [];
+        const annotationDataArray = [];
         await Promise.all(
           imageArray.map(async (item) => {
             const imageData = await itemServiceFiles.readOne(
@@ -202,16 +230,29 @@ export default {
             imageDataArray.push(imageData);
           })
         );
-
+        await Promise.all(
+          annotationArray.map(async (item) => {
+            const annotationData = await itemServiceFiles.readOne(
+              item.directus_files_id,
+              {
+                fields: ["id", "title", "filename_download"],
+              }
+            );
+            annotationDataArray.push(annotationData);
+          })
+        );
         const iiifMetaItems = iiif_meta.map((item) => {
           const iiifMetaArray = [];
           iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`]);
           return iiifMetaArray;
         });
-        const sorted = imageDataArray.sort((a, b) =>
+        const image_sorted = imageDataArray.sort((a, b) =>
           a.title > b.title ? 1 : -1
         );
-        const items = createItemArray(sorted);
+        const annotation_sorted = annotationDataArray.sort((a, b) =>
+          a.title > b.title ? 1 : -1
+        );
+        const items = createItemArray(image_sorted, annotation_sorted);
 
         res.send(
           createIiifCollectionJson(
