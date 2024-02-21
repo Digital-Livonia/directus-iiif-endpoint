@@ -239,7 +239,7 @@ export default {
             imageDataArray.push(imageData);
           })
         );
-        const annotation_sorted = [];
+        var annotation_sorted = [];
         if (typeof annotationArray !== "undefined") {
           await Promise.all(
             annotationArray.map(async (item) => {
