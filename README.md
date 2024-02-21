@@ -20,3 +20,5 @@ There has been some discussion about the IIIF support for Directus: https://gith
 - Support for asset author
 ### 1.0.2
 - Thumbnail url and size update
+### 1.0.3
+- Annotations support
