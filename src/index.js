@@ -33,7 +33,9 @@ const createItemArray = (results, annotations) => {
     const annotationData = getAnnotations(annotations, item.title);
     return {
       id: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
-      all: `${item.title}`,
+      label: {
+        none: [`${index + 1}`],
+      },
       filename: `${item.filename_download}`,
       type: "Canvas",
       height: `${item.height}`,
