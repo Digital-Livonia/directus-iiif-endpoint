@@ -24,57 +24,56 @@ function getAnnotations(annotations, title) {
       )}.json`,
       type: "AnnotationPage",
     };
-  } else return null
+  } else return null;
 }
 
 const createItemArray = (results, annotations) => {
-    const thumbWidth = 100;
-    const items = results.map((item, index) => {
-        const annotationData = getAnnotations(annotations, item.title);
-        return {
-            id: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
-            all: `${item.title}`,
-            filename: `${item.filename_download}`,
-            type: "Canvas",
-            height: `${item.height}`,
-            width: `${item.width}`,
-            metadata: prepAuthor(item.author),
-            thumbnail: [
-                {
-                    id: `https://db.dl.tlu.ee/assets/${item.id}?key=thumbnail`,
-                    type: "Image",
-                    format: "image/png",
-                    width: `${thumbWidth}`,
-                    height: `${Math.round((thumbWidth * item.height) / item.width)}`,
-                },
-            ],
-            items: [
-                {
-                    id: `https://db.dl.tlu.ee/iiif/image/page/${index + 1}`,
-                    type: "AnnotationPage",
-                    items: [
-                        {
-                            id: `https://db.dl.tlu.ee/iiif/image/${index + 1}`,
-                            type: "Annotation",
-                            motivation: "painting",
-                            body: {
-                                id: `https://db.dl.tlu.ee/assets/${item.id}?format=jpg`, //lets make sure it is JPG by using format=jpg
-                                type: "Image",
-                                format: "image/jpeg",
-                                height: `${item.height}`,
-                                width: `${item.width}`,
-                            },
-                            target: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
-                        },
-                    ],
-                },
-            ],
-            ...(annotationData ? {annotations: [annotationData]} : {}),
-        };
-    });
-    return items;
+  const thumbWidth = 100;
+  const items = results.map((item, index) => {
+    const annotationData = getAnnotations(annotations, item.title);
+    return {
+      id: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
+      all: `${item.title}`,
+      filename: `${item.filename_download}`,
+      type: "Canvas",
+      height: `${item.height}`,
+      width: `${item.width}`,
+      metadata: prepAuthor(item.author),
+      thumbnail: [
+        {
+          id: `https://db.dl.tlu.ee/assets/${item.id}?key=thumbnail`,
+          type: "Image",
+          format: "image/png",
+          width: `${thumbWidth}`,
+          height: `${Math.round((thumbWidth * item.height) / item.width)}`,
+        },
+      ],
+      items: [
+        {
+          id: `https://db.dl.tlu.ee/iiif/image/page/${index + 1}`,
+          type: "AnnotationPage",
+          items: [
+            {
+              id: `https://db.dl.tlu.ee/iiif/image/${index + 1}`,
+              type: "Annotation",
+              motivation: "painting",
+              body: {
+                id: `https://db.dl.tlu.ee/assets/${item.id}?format=jpg`, //lets make sure it is JPG by using format=jpg
+                type: "Image",
+                format: "image/jpeg",
+                height: `${item.height}`,
+                width: `${item.width}`,
+              },
+              target: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
+            },
+          ],
+        },
+      ],
+      ...(annotationData ? { annotations: [annotationData] } : {}),
+    };
+  });
+  return items;
 };
-
 
 const createIiifCollectionJson = (
   canvasLabel,
@@ -238,17 +237,23 @@ export default {
             imageDataArray.push(imageData);
           })
         );
-        await Promise.all(
-          annotationArray.map(async (item) => {
-            const annotationData = await itemServiceFiles.readOne(
-              item.directus_files_id,
-              {
-                fields: ["id", "title", "filename_download"],
-              }
-            );
-            annotationDataArray.push(annotationData);
-          })
-        );
+        const annotation_sorted = [];
+        if (typeof annotationArray !== "undefined") {
+          await Promise.all(
+            annotationArray.map(async (item) => {
+              const annotationData = await itemServiceFiles.readOne(
+                item.directus_files_id,
+                {
+                  fields: ["id", "title", "filename_download"],
+                }
+              );
+              annotationDataArray.push(annotationData);
+            })
+          );
+          annotation_sorted = annotationDataArray.sort((a, b) =>
+            a.title > b.title ? 1 : -1
+          );
+        }
         const iiifMetaItems = iiif_meta.map((item) => {
           const iiifMetaArray = [];
           iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`]);
@@ -257,9 +262,7 @@ export default {
         const image_sorted = imageDataArray.sort((a, b) =>
           a.title > b.title ? 1 : -1
         );
-        const annotation_sorted = annotationDataArray.sort((a, b) =>
-          a.title > b.title ? 1 : -1
-        );
+
         const items = createItemArray(image_sorted, annotation_sorted);
 
         res.send(
