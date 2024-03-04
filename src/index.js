@@ -72,6 +72,22 @@ const createItemArray = (results, annotations) => {
         },
       ],
       ...(annotationData ? { annotations: [annotationData] } : {}),
+      seeAlso: [
+        {
+          "id": "https://db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
+          "type": "Text",
+          "format": "text/plain",
+        }
+      ],
+
+      rendering: [
+        {
+          "id": "https://db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
+          "type": "Text",
+          "label": { "en": [ "Download as TXT" ] },
+          "format": "text/plain"
+        }
+      ],
     };
   });
   return items;
@@ -193,6 +209,7 @@ export default {
           iiif_meta,
           annotation_files,
           alto_files,
+          txt_files,
         } = fieldSettings[0];
 
         const collectionDataFields = [
@@ -200,6 +217,7 @@ export default {
           iiif_canvas_label,
           `${annotation_files}.*`,
           `${alto_files}.*`,
+          `${txt_files}.*`,
         ];
         // let's add fields from the user defined configuration
         iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`));
@@ -213,6 +231,12 @@ export default {
             [annotation_files]: {
               _limit: -1,
             },
+            [txt_files]: {
+              _limit: -1,
+            },
+            [alto_files]: {
+              _limit: -1,
+            },
           },
         });
         const imageArray = collectionData[iiif_file];
@@ -220,6 +244,8 @@ export default {
         const canvasLabel = collectionData[iiif_canvas_label];
         const imageDataArray = [];
         const annotationDataArray = [];
+        const altoDataArray = [];
+        const txtDataArray = [];
         await Promise.all(
           imageArray.map(async (item) => {
             const imageData = await itemServiceFiles.readOne(
@@ -256,6 +282,43 @@ export default {
             a.title > b.title ? 1 : -1
           );
         }
+
+        var txt_files_sorted = [];
+        if (typeof annotationArray !== "undefined") {
+          await Promise.all(
+            txtArray.map(async (item) => {
+              const txtData = await itemServiceFiles.readOne(
+                item.directus_files_id,
+                {
+                  fields: ["id", "title", "filename_download"],
+                }
+              );
+              txtDataArray.push(txtData);
+            })
+          );
+          txt_files_sorted = txtDataArray.sort((a, b) =>
+            a.title > b.title ? 1 : -1
+          );
+        }
+
+        var alto_sorted = [];
+        if (typeof altoArray !== "undefined") {
+          await Promise.all(
+            altoArray.map(async (item) => {
+              const altoData = await itemServiceFiles.readOne(
+                item.directus_files_id,
+                {
+                  fields: ["id", "title", "filename_download"],
+                }
+              );
+              altoDataArray.push(altoData);
+            })
+          );
+          alto_sorted = altoDataArray.sort((a, b) =>
+            a.title > b.title ? 1 : -1
+          );
+        }
+
         const iiifMetaItems = iiif_meta.map((item) => {
           const iiifMetaArray = [];
           iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`]);
