@@ -241,6 +241,8 @@ export default {
         });
         const imageArray = collectionData[iiif_file];
         const annotationArray = collectionData[`${annotation_files}`];
+        const txtArray = collectionData[`${txt_files}`];
+        const altoArray = collectionData[`${alto_files}`];
         const canvasLabel = collectionData[iiif_canvas_label];
         const imageDataArray = [];
         const annotationDataArray = [];
@@ -284,7 +286,7 @@ export default {
         }
 
         var txt_files_sorted = [];
-        if (typeof annotationArray !== "undefined") {
+        if (typeof txtArray !== "undefined") {
           await Promise.all(
             txtArray.map(async (item) => {
               const txtData = await itemServiceFiles.readOne(
