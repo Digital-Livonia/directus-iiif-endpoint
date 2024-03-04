@@ -38,16 +38,15 @@ const createItemArray = (results, annotations) => {
       },
       filename: `${item.filename_download}`,
       type: "Canvas",
-      height: `${item.height}`,
-      width: `${item.width}`,
-      metadata: prepAuthor(item.author),
+      height: item.height,
+      width: item.width,
       thumbnail: [
         {
           id: `https://db.dl.tlu.ee/assets/${item.id}?key=thumbnail`,
           type: "Image",
           format: "image/png",
-          width: `${thumbWidth}`,
-          height: `${Math.round((thumbWidth * item.height) / item.width)}`,
+          width: thumbWidth,
+          height: Math.round((thumbWidth * item.height) / item.width),
         },
       ],
       items: [
@@ -63,8 +62,8 @@ const createItemArray = (results, annotations) => {
                 id: `https://db.dl.tlu.ee/assets/${item.id}?format=jpg`, //lets make sure it is JPG by using format=jpg
                 type: "Image",
                 format: "image/jpeg",
-                height: `${item.height}`,
-                width: `${item.width}`,
+                height: item.height,
+                width: item.width,
               },
               target: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
             },
@@ -74,19 +73,19 @@ const createItemArray = (results, annotations) => {
       ...(annotationData ? { annotations: [annotationData] } : {}),
       seeAlso: [
         {
-          "id": "https://db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
-          "type": "Text",
-          "format": "text/plain",
-        }
+          id: "https://db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
+          type: "Text",
+          format: "text/plain",
+        },
       ],
 
       rendering: [
         {
-          "id": "https://db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
-          "type": "Text",
-          "label": { "en": [ "Download as TXT" ] },
-          "format": "text/plain"
-        }
+          id: "https://db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
+          type: "Text",
+          label: { en: ["Download as TXT"] },
+          format: "text/plain",
+        },
       ],
     };
   });
@@ -102,8 +101,8 @@ const createIiifCollectionJson = (
   sorted
 ) => {
   const iiifMetaItems = iiifMeta.map((item) => ({
-    label: [`${item[0]}`],
-    value: [`${item[1]}`],
+    label: { et: [`${item[0]}`] },
+    value: { et: [`${item[1]}`] },
   }));
 
   return {
@@ -130,8 +129,8 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
     {
       id: "https://db.dl.tlu.ee/iiif/canvas/1",
       type: "Canvas",
-      height: `${height}`,
-      width: `${width}`,
+      height: height,
+      width: width,
       items: [
         {
           id: "https://db.dl.tlu.ee/iiif/image/page/1",
@@ -145,8 +144,8 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
                 id: `https://db.dl.tlu.ee/assets/${fileId}?format=jpg`, //lets make sure it is JPG by using format=jpg
                 type: "Image",
                 format: "image/jpeg",
-                height: `${height}`,
-                width: `${width}`,
+                height: height,
+                width: width,
               },
               target: "https://db.dl.tlu.ee/iiif/canvas/1",
             },
