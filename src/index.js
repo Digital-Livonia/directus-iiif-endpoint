@@ -15,56 +15,80 @@ function findIdByTitle(annotations, title) {
   return annotation ? annotation.id : null;
 }
 
+function getAnnotations(annotations, title) {
+  if (annotations.length > 0) {
+    return {
+      id: `https://db.dl.tlu.ee/assets/${findIdByTitle(
+        annotations,
+        title
+      )}.json`,
+      type: "AnnotationPage",
+    };
+  } else return null;
+}
+
 const createItemArray = (results, annotations) => {
   const thumbWidth = 100;
-  const items = results.map((item, index) => ({
-    id: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
-    all: `${item.title}`,
-    filename: `${item.filename_download}`,
-    type: "Canvas",
-    height: `${item.height}`,
-    width: `${item.width}`,
-    metadata: prepAuthor(item.author),
-    thumbnail: [
-      {
-        id: `https://db.dl.tlu.ee/assets/${item.id}?key=thumbnail`,
-        type: "Image",
-        format: "image/png",
-        width: `${thumbWidth}`,
-        height: `${Math.round((thumbWidth * item.height) / item.width)}`,
+  const items = results.map((item, index) => {
+    const annotationData = getAnnotations(annotations, item.title);
+    return {
+      id: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
+      label: {
+        none: [`${index + 1}`],
       },
-    ],
-    items: [
-      {
-        id: `https://db.dl.tlu.ee/iiif/image/page/${index + 1}`,
-        type: "AnnotationPage",
-        items: [
-          {
-            id: `https://db.dl.tlu.ee/iiif/image/${index + 1}`,
-            type: "Annotation",
-            motivation: "painting",
-            body: {
-              id: `https://db.dl.tlu.ee/assets/${item.id}?format=jpg`, //lets make sure it is JPG by using format=jpg
-              type: "Image",
-              format: "image/jpeg",
-              height: `${item.height}`,
-              width: `${item.width}`,
+      filename: `${item.filename_download}`,
+      type: "Canvas",
+      height: item.height,
+      width: item.width,
+      thumbnail: [
+        {
+          id: `https://db.dl.tlu.ee/assets/${item.id}?key=thumbnail`,
+          type: "Image",
+          format: "image/png",
+          width: thumbWidth,
+          height: Math.round((thumbWidth * item.height) / item.width),
+        },
+      ],
+      items: [
+        {
+          id: `https://db.dl.tlu.ee/iiif/image/page/${index + 1}`,
+          type: "AnnotationPage",
+          items: [
+            {
+              id: `https://db.dl.tlu.ee/iiif/image/${index + 1}`,
+              type: "Annotation",
+              motivation: "painting",
+              body: {
+                id: `https://db.dl.tlu.ee/assets/${item.id}?format=jpg`, //lets make sure it is JPG by using format=jpg
+                type: "Image",
+                format: "image/jpeg",
+                height: item.height,
+                width: item.width,
+              },
+              target: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
             },
-            target: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
-          },
-        ],
-      },
-    ],
-    annotations: [
-      {
-        id: `https://db.dl.tlu.ee/assets/${findIdByTitle(
-          annotations,
-          item.title
-        )}.json`,
-        type: "AnnotationPage",
-      },
-    ],
-  }));
+          ],
+        },
+      ],
+      ...(annotationData ? { annotations: [annotationData] } : {}),
+      seeAlso: [
+        {
+          id: "https://db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
+          type: "Text",
+          format: "text/plain",
+        },
+      ],
+
+      rendering: [
+        {
+          id: "https://db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
+          type: "Text",
+          label: { en: ["Download as TXT"] },
+          format: "text/plain",
+        },
+      ],
+    };
+  });
   return items;
 };
 
@@ -77,8 +101,8 @@ const createIiifCollectionJson = (
   sorted
 ) => {
   const iiifMetaItems = iiifMeta.map((item) => ({
-    label: [`${item[0]}`],
-    value: [`${item[1]}`],
+    label: { et: [`${item[0]}`] },
+    value: { et: [`${item[1]}`] },
   }));
 
   return {
@@ -105,8 +129,8 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
     {
       id: "https://db.dl.tlu.ee/iiif/canvas/1",
       type: "Canvas",
-      height: `${height}`,
-      width: `${width}`,
+      height: height,
+      width: width,
       items: [
         {
           id: "https://db.dl.tlu.ee/iiif/image/page/1",
@@ -120,8 +144,8 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
                 id: `https://db.dl.tlu.ee/assets/${fileId}?format=jpg`, //lets make sure it is JPG by using format=jpg
                 type: "Image",
                 format: "image/jpeg",
-                height: `${height}`,
-                width: `${width}`,
+                height: height,
+                width: width,
               },
               target: "https://db.dl.tlu.ee/iiif/canvas/1",
             },
@@ -184,6 +208,7 @@ export default {
           iiif_meta,
           annotation_files,
           alto_files,
+          txt_files,
         } = fieldSettings[0];
 
         const collectionDataFields = [
@@ -191,6 +216,7 @@ export default {
           iiif_canvas_label,
           `${annotation_files}.*`,
           `${alto_files}.*`,
+          `${txt_files}.*`,
         ];
         // let's add fields from the user defined configuration
         iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`));
@@ -204,13 +230,23 @@ export default {
             [annotation_files]: {
               _limit: -1,
             },
+            [txt_files]: {
+              _limit: -1,
+            },
+            [alto_files]: {
+              _limit: -1,
+            },
           },
         });
         const imageArray = collectionData[iiif_file];
         const annotationArray = collectionData[`${annotation_files}`];
+        const txtArray = collectionData[`${txt_files}`];
+        const altoArray = collectionData[`${alto_files}`];
         const canvasLabel = collectionData[iiif_canvas_label];
         const imageDataArray = [];
         const annotationDataArray = [];
+        const altoDataArray = [];
+        const txtDataArray = [];
         await Promise.all(
           imageArray.map(async (item) => {
             const imageData = await itemServiceFiles.readOne(
@@ -230,17 +266,60 @@ export default {
             imageDataArray.push(imageData);
           })
         );
-        await Promise.all(
-          annotationArray.map(async (item) => {
-            const annotationData = await itemServiceFiles.readOne(
-              item.directus_files_id,
-              {
-                fields: ["id", "title", "filename_download"],
-              }
-            );
-            annotationDataArray.push(annotationData);
-          })
-        );
+        var annotation_sorted = [];
+        if (typeof annotationArray !== "undefined") {
+          await Promise.all(
+            annotationArray.map(async (item) => {
+              const annotationData = await itemServiceFiles.readOne(
+                item.directus_files_id,
+                {
+                  fields: ["id", "title", "filename_download"],
+                }
+              );
+              annotationDataArray.push(annotationData);
+            })
+          );
+          annotation_sorted = annotationDataArray.sort((a, b) =>
+            a.title > b.title ? 1 : -1
+          );
+        }
+
+        var txt_files_sorted = [];
+        if (typeof txtArray !== "undefined") {
+          await Promise.all(
+            txtArray.map(async (item) => {
+              const txtData = await itemServiceFiles.readOne(
+                item.directus_files_id,
+                {
+                  fields: ["id", "title", "filename_download"],
+                }
+              );
+              txtDataArray.push(txtData);
+            })
+          );
+          txt_files_sorted = txtDataArray.sort((a, b) =>
+            a.title > b.title ? 1 : -1
+          );
+        }
+
+        var alto_sorted = [];
+        if (typeof altoArray !== "undefined") {
+          await Promise.all(
+            altoArray.map(async (item) => {
+              const altoData = await itemServiceFiles.readOne(
+                item.directus_files_id,
+                {
+                  fields: ["id", "title", "filename_download"],
+                }
+              );
+              altoDataArray.push(altoData);
+            })
+          );
+          alto_sorted = altoDataArray.sort((a, b) =>
+            a.title > b.title ? 1 : -1
+          );
+        }
+
         const iiifMetaItems = iiif_meta.map((item) => {
           const iiifMetaArray = [];
           iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`]);
@@ -249,9 +328,7 @@ export default {
         const image_sorted = imageDataArray.sort((a, b) =>
           a.title > b.title ? 1 : -1
         );
-        const annotation_sorted = annotationDataArray.sort((a, b) =>
-          a.title > b.title ? 1 : -1
-        );
+
         const items = createItemArray(image_sorted, annotation_sorted);
 
         res.send(
