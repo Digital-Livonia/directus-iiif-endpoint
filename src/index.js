@@ -18,7 +18,7 @@ function findIdByTitle(annotations, title) {
 function getAnnotations(annotations, title) {
   if (annotations.length > 0) {
     return {
-      id: `https://db.dl.tlu.ee/assets/${findIdByTitle(
+      id: `https://dev.db.dl.tlu.ee/assets/${findIdByTitle(
         annotations,
         title
       )}.json`,
@@ -32,7 +32,7 @@ const createItemArray = (results, annotations) => {
   const items = results.map((item, index) => {
     const annotationData = getAnnotations(annotations, item.title);
     return {
-      id: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
+      id: `https://dev.db.dl.tlu.ee/iiif/canvas/${index + 1}`,
       label: {
         none: [`${index + 1}`],
       },
@@ -42,7 +42,7 @@ const createItemArray = (results, annotations) => {
       width: item.width,
       thumbnail: [
         {
-          id: `https://db.dl.tlu.ee/assets/${item.id}?key=thumbnail`,
+          id: `https://dev.db.dl.tlu.ee/assets/${item.id}?key=thumbnail`,
           type: "Image",
           format: "image/png",
           width: thumbWidth,
@@ -51,21 +51,21 @@ const createItemArray = (results, annotations) => {
       ],
       items: [
         {
-          id: `https://db.dl.tlu.ee/iiif/image/page/${index + 1}`,
+          id: `https://dev.db.dl.tlu.ee/iiif/image/page/${index + 1}`,
           type: "AnnotationPage",
           items: [
             {
-              id: `https://db.dl.tlu.ee/iiif/image/${index + 1}`,
+              id: `https://dev.db.dl.tlu.ee/iiif/image/${index + 1}`,
               type: "Annotation",
               motivation: "painting",
               body: {
-                id: `https://db.dl.tlu.ee/assets/${item.id}?format=jpg`, //lets make sure it is JPG by using format=jpg
+                id: `https://dev.db.dl.tlu.ee/assets/${item.id}?format=jpg`, //lets make sure it is JPG by using format=jpg
                 type: "Image",
                 format: "image/jpeg",
                 height: item.height,
                 width: item.width,
               },
-              target: `https://db.dl.tlu.ee/iiif/canvas/${index + 1}`,
+              target: `https://dev.db.dl.tlu.ee/iiif/canvas/${index + 1}`,
             },
           ],
         },
@@ -73,7 +73,7 @@ const createItemArray = (results, annotations) => {
       ...(annotationData ? { annotations: [annotationData] } : {}),
       seeAlso: [
         {
-          id: "https://db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
+          id: "https://dev.db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
           type: "Text",
           format: "text/plain",
         },
@@ -81,7 +81,7 @@ const createItemArray = (results, annotations) => {
 
       rendering: [
         {
-          id: "https://db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
+          id: "https://dev.db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
           type: "Text",
           label: { en: ["Download as TXT"] },
           format: "text/plain",
@@ -108,7 +108,7 @@ const createIiifCollectionJson = (
   return {
     "@context": "http://iiif.io/api/presentation/3/context.json",
     sorted: sorted,
-    id: `https://db.dl.tlu.ee/iiif/manifest/${collection}/${fileId}`,
+    id: `https://dev.db.dl.tlu.ee/iiif/manifest/${collection}/${fileId}`,
     type: "Manifest",
     label: {
       et: [`${canvasLabel}`],
@@ -119,7 +119,7 @@ const createIiifCollectionJson = (
 };
 const createIiifSingleImageJson = (fileId, height, width) => ({
   "@context": "http://iiif.io/api/presentation/3/context.json",
-  id: `https://db.dl.tlu.ee/iiif/manifest/file/${fileId}`,
+  id: `https://dev.db.dl.tlu.ee/iiif/manifest/file/${fileId}`,
   type: "Manifest",
   label: {
     en: ["Image"],
@@ -127,27 +127,27 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
   rights: "http://creativecommons.org/licenses/by/4.0/",
   items: [
     {
-      id: "https://db.dl.tlu.ee/iiif/canvas/1",
+      id: "https://dev.db.dl.tlu.ee/iiif/canvas/1",
       type: "Canvas",
       height: height,
       width: width,
       items: [
         {
-          id: "https://db.dl.tlu.ee/iiif/image/page/1",
+          id: "https://dev.db.dl.tlu.ee/iiif/image/page/1",
           type: "AnnotationPage",
           items: [
             {
-              id: "https://db.dl.tlu.ee/iiif/image/1",
+              id: "https://dev.db.dl.tlu.ee/iiif/image/1",
               type: "Annotation",
               motivation: "painting",
               body: {
-                id: `https://db.dl.tlu.ee/assets/${fileId}?format=jpg`, //lets make sure it is JPG by using format=jpg
+                id: `https://dev.db.dl.tlu.ee/assets/${fileId}?format=jpg`, //lets make sure it is JPG by using format=jpg
                 type: "Image",
                 format: "image/jpeg",
                 height: height,
                 width: width,
               },
-              target: "https://db.dl.tlu.ee/iiif/canvas/1",
+              target: "https://dev.db.dl.tlu.ee/iiif/canvas/1",
             },
           ],
         },
@@ -163,7 +163,7 @@ export default {
     const { ServiceUnavailableException } = exceptions;
 
     router.get("/", (req, res) => res.send("IIIF"));
-    router.get("/manifest/file/:file_id", function (req, res, next) {
+    /*router.get("/manifest/file/:file_id", function (req, res, next) {
       const fileService = new ItemsService("directus_files", {
         schema: req.schema,
         accountability: req.accountability,
@@ -179,7 +179,7 @@ export default {
         .catch((error) => {
           return next(new ServiceUnavailableException(error.message));
         });
-    });
+    });*/
     router.get(
       "/manifest/:collection/:file_id",
       async function (req, res, next) {
@@ -218,6 +218,15 @@ export default {
           `${alto_files}.*`,
           `${txt_files}.*`,
         ];
+
+        console.log(fileId, "fileId");
+        console.log(collection, "collection");
+        console.log(iiif_file, "iiif_file");
+        console.log(iiif_canvas_label, "iiif_canvas_label");
+        console.log(iiif_meta, "iiif_meta");
+        console.log(annotation_files, "annotation_files");
+        console.log(alto_files, "alto_files");
+        console.log(txt_files, "txt_files");
         // let's add fields from the user defined configuration
         iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`));
         const collectionData = await itemServiceCollection.readOne(fileId, {
@@ -247,6 +256,7 @@ export default {
         const annotationDataArray = [];
         const altoDataArray = [];
         const txtDataArray = [];
+
         await Promise.all(
           imageArray.map(async (item) => {
             const imageData = await itemServiceFiles.readOne(
@@ -266,6 +276,7 @@ export default {
             imageDataArray.push(imageData);
           })
         );
+
         var annotation_sorted = [];
         if (typeof annotationArray !== "undefined") {
           await Promise.all(
