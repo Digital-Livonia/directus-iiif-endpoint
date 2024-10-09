@@ -7,21 +7,21 @@ const prepAuthor = (value) =>
     ? [{ label: { et: ["Fotograaf"], en: ["Photpgrapher"] }, value: value }]
     : "";
 
+const directusEndpoint = process.env.PUBLIC_URL;
+const directusAssets = `${directusEndpoint}/assets/`;
 // Function to find ID by title
 function findIdByTitle(annotations, title) {
   const annotation = annotations.find(
     (annotation) => annotation.title === title
   );
-  return annotation ? annotation.id : null;
+  return annotation ? annotation.id : false;
 }
 
 function getAnnotations(annotations, title) {
-  if (annotations.length > 0) {
+  const annoId = findIdByTitle(annotations, title)
+  if (annoId) {
     return {
-      id: `https://dev.db.dl.tlu.ee/assets/${findIdByTitle(
-        annotations,
-        title
-      )}.json`,
+      id: `${directusAssets}${annoId}.json`,
       type: "AnnotationPage",
     };
   } else return null;
@@ -32,7 +32,7 @@ const createItemArray = (results, annotations) => {
   const items = results.map((item, index) => {
     const annotationData = getAnnotations(annotations, item.title);
     return {
-      id: `https://dev.db.dl.tlu.ee/iiif/canvas/${index + 1}`,
+      id: `${directusEndpoint}/iiif/canvas/${index + 1}`,
       label: {
         none: [`${index + 1}`],
       },
@@ -42,7 +42,7 @@ const createItemArray = (results, annotations) => {
       width: item.width,
       thumbnail: [
         {
-          id: `https://dev.db.dl.tlu.ee/assets/${item.id}?key=thumbnail`,
+          id: `${directusAssets}${item.id}?key=thumbnail`,
           type: "Image",
           format: "image/png",
           width: thumbWidth,
@@ -51,21 +51,21 @@ const createItemArray = (results, annotations) => {
       ],
       items: [
         {
-          id: `https://dev.db.dl.tlu.ee/iiif/image/page/${index + 1}`,
+          id: `${directusEndpoint}/iiif/image/page/${index + 1}`,
           type: "AnnotationPage",
           items: [
             {
-              id: `https://dev.db.dl.tlu.ee/iiif/image/${index + 1}`,
+              id: `${directusEndpoint}/iiif/image/${index + 1}`,
               type: "Annotation",
               motivation: "painting",
               body: {
-                id: `https://dev.db.dl.tlu.ee/assets/${item.id}?format=jpg`, //lets make sure it is JPG by using format=jpg
+                id: `${directusAssets}${item.id}?format=jpg`,
                 type: "Image",
                 format: "image/jpeg",
                 height: item.height,
                 width: item.width,
               },
-              target: `https://dev.db.dl.tlu.ee/iiif/canvas/${index + 1}`,
+              target: `${directusEndpoint}/iiif/canvas/${index + 1}`,
             },
           ],
         },
@@ -73,7 +73,7 @@ const createItemArray = (results, annotations) => {
       ...(annotationData ? { annotations: [annotationData] } : {}),
       seeAlso: [
         {
-          id: "https://dev.db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
+          id: `${directusAssets}e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4`,
           type: "Text",
           format: "text/plain",
         },
@@ -81,7 +81,7 @@ const createItemArray = (results, annotations) => {
 
       rendering: [
         {
-          id: "https://dev.db.dl.tlu.ee/assets/e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4",
+          id: `${directusAssets}e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4`,
           type: "Text",
           label: { en: ["Download as TXT"] },
           format: "text/plain",
@@ -108,7 +108,7 @@ const createIiifCollectionJson = (
   return {
     "@context": "http://iiif.io/api/presentation/3/context.json",
     sorted: sorted,
-    id: `https://dev.db.dl.tlu.ee/iiif/manifest/${collection}/${fileId}`,
+    id: `${directusEndpoint}/iiif/manifest/${collection}/${fileId}`,
     type: "Manifest",
     label: {
       et: [`${canvasLabel}`],
@@ -119,7 +119,7 @@ const createIiifCollectionJson = (
 };
 const createIiifSingleImageJson = (fileId, height, width) => ({
   "@context": "http://iiif.io/api/presentation/3/context.json",
-  id: `https://dev.db.dl.tlu.ee/iiif/manifest/file/${fileId}`,
+  id: `${directusEndpoint}/iiif/manifest/file/${fileId}`,
   type: "Manifest",
   label: {
     en: ["Image"],
@@ -127,27 +127,27 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
   rights: "http://creativecommons.org/licenses/by/4.0/",
   items: [
     {
-      id: "https://dev.db.dl.tlu.ee/iiif/canvas/1",
+      id: `${directusEndpoint}/iiif/canvas/1`,
       type: "Canvas",
       height: height,
       width: width,
       items: [
         {
-          id: "https://dev.db.dl.tlu.ee/iiif/image/page/1",
+          id: `${directusEndpoint}/iiif/image/page/1`,
           type: "AnnotationPage",
           items: [
             {
-              id: "https://dev.db.dl.tlu.ee/iiif/image/1",
+              id: `${directusEndpoint}/iiif/image/1`,
               type: "Annotation",
               motivation: "painting",
               body: {
-                id: `https://dev.db.dl.tlu.ee/assets/${fileId}?format=jpg`, //lets make sure it is JPG by using format=jpg
+                id: `${directusAssets}${fileId}?format=jpg`,
                 type: "Image",
                 format: "image/jpeg",
                 height: height,
                 width: width,
               },
-              target: "https://dev.db.dl.tlu.ee/iiif/canvas/1",
+              target: `${directusEndpoint}/iiif/canvas/1`,
             },
           ],
         },
