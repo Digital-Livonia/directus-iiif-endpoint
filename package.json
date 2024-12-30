@@ -18,6 +18,16 @@
 	},
 	"scripts": {
 		"build": "directus-extension build",
-		"dev": "directus-extension build -w --no-minify"
+		"dev": "directus-extension build -w --no-minify",
+		"lint": "eslint .",
+		"lint:fix": "eslint --fix ."
+	},
+	"devDependencies": {
+		"eslint": "^8.57.1",
+		"eslint-config-standard": "^17.1.0",
+		"eslint-plugin-import": "^2.31.0",
+		"eslint-plugin-n": "^16.6.2",
+		"eslint-plugin-promise": "^6.6.0",
+		"eslint-plugin-react": "^7.37.1"
 	}
 }
