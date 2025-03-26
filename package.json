@@ -20,7 +20,8 @@
 		"build": "directus-extension build",
 		"dev": "directus-extension build -w --no-minify",
 		"lint": "eslint .",
-		"lint:fix": "eslint --fix ."
+		"lint:fix": "eslint --fix .",
+		"package": "rm -rf dist && mkdir dist && npm run build && cp -r build dist/build && cp package.json dist/ && cp README.md dist/ || true"
 	},
 	"devDependencies": {
 		"eslint": "^8.57.1",

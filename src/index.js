@@ -6,8 +6,8 @@ const directusEndpoint = process.env.PUBLIC_URL
 const directusAssets = `${directusEndpoint}/assets/`
 // Function to find ID by title
 function findIdByFile (annotations, filename_download) {
-  console.log(filename_download,'filename_download')
-  console.log(annotations,'annotations')
+  console.log(filename_download, 'filename_download')
+  console.log(annotations, 'annotations')
   const annotation = annotations.find(
     (annotation) => annotation.filename_download === filename_download
   )
@@ -26,9 +26,21 @@ function getAnnotations (annotations, filename_download) {
 
 const createItemArray = (results, annotations) => {
   const thumbWidth = 100
-  const items = results.map((item, index) => {
+  return results.map((item, index) => {
     const filename_download = item.filename_download.split('.')[0] + '.json'
     const annotationData = getAnnotations(annotations, filename_download)
+
+    const renderingItems = [
+      {
+        id: `${directusAssets}${item.id}?download=${item.filename_download}`,
+        type: 'Text',
+        label: {
+          en: [`Download original (${item.filename_download.split('.').pop().toUpperCase()})`]
+        },
+        format: item.type
+      }
+    ]
+
     return {
       id: `${directusEndpoint}/iiif/canvas/${index + 1}`,
       label: {
@@ -69,25 +81,9 @@ const createItemArray = (results, annotations) => {
         }
       ],
       ...(annotationData ? { annotations: [annotationData] } : {}),
-      seeAlso: [
-        {
-          id: `${directusAssets}e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4`,
-          type: 'Text',
-          format: 'text/plain'
-        }
-      ],
-
-      rendering: [
-        {
-          id: `${directusAssets}e48bc0d7-4cfb-460d-8c5b-00eeb148ddd4`,
-          type: 'Text',
-          label: { en: ['Download as TXT'] },
-          format: 'text/plain'
-        }
-      ]
+      rendering: renderingItems
     }
   })
-  return items
 }
 
 const createIiifCollectionJson = (
@@ -160,7 +156,7 @@ export default {
   id: 'iiif',
   handler: (router, { services, exceptions }) => {
     const { ItemsService } = services
-    //const { ServiceUnavailableException } = exceptions
+    // const { ServiceUnavailableException } = exceptions
 
     router.get('/', (req, res) => res.send('IIIF'))
     /* router.get("/manifest/file/:file_id", function (req, res, next) {
