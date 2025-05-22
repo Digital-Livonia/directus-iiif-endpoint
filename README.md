@@ -22,6 +22,8 @@ This is work in progress. Currently extension extension adds [IIIF presentation 
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
+### 1.0.5
+- IIIF content search support for items with annotations
 ### 1.0.4
 - Image Download link added via `rendering` property
 ### 1.0.3

@@ -2,89 +2,94 @@
 // selle järgi pärida faili mõõtmed directus_files tabelist ning asendada height ja width väärtused
 // kas api väljund cachetakse kuidagi? tegelit poleks vaja ju uusi päringuid teha alati ...
 
-const directusEndpoint = process.env.PUBLIC_URL
-const directusAssets = `${directusEndpoint}/assets/`
+const directusEndpoint = process.env.PUBLIC_URL;
+const directusAssets = `${directusEndpoint}/assets/`;
 // Function to find ID by title
-function findIdByFile (annotations, filename_download) {
-  console.log(filename_download, 'filename_download')
-  console.log(annotations, 'annotations')
+function findIdByFile(annotations, filename_download) {
+  console.log(filename_download, "filename_download");
+  console.log(annotations, "annotations");
   const annotation = annotations.find(
     (annotation) => annotation.filename_download === filename_download
-  )
-  return annotation ? annotation.id : false
+  );
+  return annotation ? annotation.id : false;
 }
 
-function getAnnotations (annotations, filename_download) {
-  const annoId = findIdByFile(annotations, filename_download)
+function getAnnotations(annotations, filename_download) {
+  const annoId = findIdByFile(annotations, filename_download);
   if (annoId) {
     return {
       id: `${directusAssets}${annoId}.json`,
-      type: 'AnnotationPage'
-    }
-  } else return null
+      type: "AnnotationPage",
+    };
+  } else return null;
 }
 
 const createItemArray = (results, annotations) => {
-  const thumbWidth = 100
+  const thumbWidth = 100;
   return results.map((item, index) => {
-    const filename_download = item.filename_download.split('.')[0] + '.json'
-    const annotationData = getAnnotations(annotations, filename_download)
+    const filename_download = item.filename_download.split(".")[0] + ".json";
+    const annotationData = getAnnotations(annotations, filename_download);
 
     const renderingItems = [
       {
         id: `${directusAssets}${item.id}?download=${item.filename_download}`,
-        type: 'Text',
+        type: "Text",
         label: {
-          en: [`Download original (${item.filename_download.split('.').pop().toUpperCase()})`]
+          en: [
+            `Download original (${item.filename_download
+              .split(".")
+              .pop()
+              .toUpperCase()})`,
+          ],
         },
-        format: item.type
-      }
-    ]
+        format: item.type,
+      },
+    ];
 
     return {
       id: `${directusEndpoint}/iiif/canvas/${index + 1}`,
       label: {
-        none: [`${index + 1}`]
+        none: [`${index + 1}`],
       },
       filename: `${item.filename_download}`,
-      type: 'Canvas',
+      type: "Canvas",
       height: item.height,
       width: item.width,
       thumbnail: [
         {
           id: `${directusAssets}${item.id}?key=thumbnail`,
-          type: 'Image',
-          format: 'image/png',
+          type: "Image",
+          format: "image/png",
           width: thumbWidth,
-          height: Math.round((thumbWidth * item.height) / item.width)
-        }
+          height: Math.round((thumbWidth * item.height) / item.width),
+        },
       ],
       items: [
         {
           id: `${directusEndpoint}/iiif/image/page/${index + 1}`,
-          type: 'AnnotationPage',
+          type: "AnnotationPage",
           items: [
             {
               id: `${directusEndpoint}/iiif/image/${index + 1}`,
-              type: 'Annotation',
-              motivation: 'painting',
+              type: "Annotation",
+              motivation: "painting",
               body: {
                 id: `${directusAssets}${item.id}?format=jpg`,
-                type: 'Image',
-                format: 'image/jpeg',
+                type: "Image",
+                format: "image/jpeg",
                 height: item.height,
-                width: item.width
+                width: item.width,
               },
-              target: `${directusEndpoint}/iiif/canvas/${index + 1}`
-            }
-          ]
-        }
+              target: `${directusEndpoint}/iiif/canvas/${index + 1}`,
+            },
+          ],
+        },
       ],
       ...(annotationData ? { annotations: [annotationData] } : {}),
-      rendering: renderingItems
-    }
-  })
-}
+      rendering: renderingItems,
+    };
+  });
+};
 
 const createIiifCollectionJson = (
   canvasLabel,
@@ -92,25 +97,35 @@ const createIiifCollectionJson = (
   collection,
   fileId,
   iiifMeta,
-  sorted
+  sorted,
+  hasAnnotations = false
 ) => {
   const iiifMetaItems = iiifMeta.map((item) => ({
     label: { et: [`${item[0]}`] },
-    value: { et: [`${item[1]}`] }
-  }))
+    value: { et: [`${item[1]}`] },
+  }));
 
   return {
-    '@context': 'http://iiif.io/api/presentation/3/context.json',
+    "@context": "http://iiif.io/api/presentation/3/context.json",
     sorted,
     id: `${directusEndpoint}/iiif/manifest/${collection}/${fileId}`,
-    type: 'Manifest',
+    type: "Manifest",
     label: {
-      et: [`${canvasLabel}`]
+      et: [`${canvasLabel}`],
     },
     metadata: iiifMetaItems,
-    items
-  }
-}
+    items,
+    ...(hasAnnotations
+      ? {
+          service: {
+            "@id": `https://dev.dl.tlu.ee/api/iiif/search`,
+            "@context": "http://iiif.io/api/search/1/context.json",
+            profile: "http://iiif.io/api/search/1/search",
+          },
+        }
+      : {}),
+  };
+};
 /*
 const createIiifSingleImageJson = (fileId, height, width) => ({
   '@context': 'http://iiif.io/api/presentation/3/context.json',
@@ -153,12 +168,12 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
 */
 
 export default {
-  id: 'iiif',
+  id: "iiif",
   handler: (router, { services, exceptions }) => {
-    const { ItemsService } = services
+    const { ItemsService } = services;
     // const { ServiceUnavailableException } = exceptions
 
-    router.get('/', (req, res) => res.send('IIIF'))
+    router.get("/", (req, res) => res.send("IIIF"));
     /* router.get("/manifest/file/:file_id", function (req, res, next) {
       const fileService = new ItemsService("directus_files", {
         schema: req.schema,
@@ -177,73 +192,72 @@ export default {
         });
     }); */
     router.get(
-      '/manifest/:collection/:file_id',
+      "/manifest/:collection/:file_id",
       async function (req, res, next) {
-        const fileId = req.params.file_id
-        const collection = req.params.collection
-
-        const itemServiceSetting = new ItemsService('IIIF_settings', {
+        const fileId = req.params.file_id;
+        const collection = req.params.collection;
+        const itemServiceSetting = new ItemsService("IIIF_settings", {
           schema: req.schema,
-          accountability: req.accountability
-        })
+          accountability: req.accountability,
+        });
         const itemServiceCollection = new ItemsService(collection, {
           schema: req.schema,
-          accountability: req.accountability
-        })
-        const itemServiceFiles = new ItemsService('directus_files', {
+          accountability: req.accountability,
+        });
+        const itemServiceFiles = new ItemsService("directus_files", {
           schema: req.schema,
-          accountability: req.accountability
-        })
+          accountability: req.accountability,
+        });
 
         const fieldSettings = await itemServiceSetting.readByQuery({
-          filter: { iiif_collection: { _eq: collection } }
-        })
+          filter: { iiif_collection: { _eq: collection } },
+        });
         const {
           iiif_file,
           iiif_canvas_label,
           iiif_meta,
           annotation_files,
           alto_files,
-          txt_files
-        } = fieldSettings[0]
+          txt_files,
+        } = fieldSettings[0];
 
         const collectionDataFields = [
           `${iiif_file}.*`,
           iiif_canvas_label,
           `${annotation_files}.*`,
           `${alto_files}.*`,
-          `${txt_files}.*`
-        ]
+          `${txt_files}.*`,
+        ];
 
         // let's add fields from the user defined configuration
-        iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`))
+        iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`));
         const collectionData = await itemServiceCollection.readOne(fileId, {
           fields: collectionDataFields,
           limit: -1,
           deep: {
             [iiif_file]: {
-              _limit: -1
+              _limit: -1,
             },
             [annotation_files]: {
-              _limit: -1
+              _limit: -1,
             },
             [txt_files]: {
-              _limit: -1
+              _limit: -1,
             },
             [alto_files]: {
-              _limit: -1
-            }
-          }
-        })
-        const imageArray = collectionData[iiif_file]
-        const annotationArray = collectionData[`${annotation_files}`]
-        const txtArray = collectionData[`${txt_files}`]
-        const altoArray = collectionData[`${alto_files}`]
-        const canvasLabel = collectionData[iiif_canvas_label]
-        const imageDataArray = []
-        const annotationDataArray = []
-        const altoDataArray = []
-        const txtDataArray = []
+              _limit: -1,
+            },
+          },
+        });
+        const imageArray = collectionData[iiif_file];
+        const annotationArray = collectionData[`${annotation_files}`];
+        const txtArray = collectionData[`${txt_files}`];
+        const altoArray = collectionData[`${alto_files}`];
+        const canvasLabel = collectionData[iiif_canvas_label];
+        const imageDataArray = [];
+        const annotationDataArray = [];
+        const altoDataArray = [];
+        const txtDataArray = [];
 
         await Promise.all(
           imageArray.map(async (item) => {
@@ -251,84 +265,85 @@ export default {
               item.directus_files_id,
               {
                 fields: [
-                  'id',
-                  'width',
-                  'height',
-                  'title',
-                  'filename_download',
-                  'author',
-                  'date'
-                ]
+                  "id",
+                  "width",
+                  "height",
+                  "title",
+                  "filename_download",
+                  "author",
+                  "date",
+                ],
               }
-            )
-            imageDataArray.push(imageData)
+            );
+            imageDataArray.push(imageData);
           })
-        )
+        );
 
-        let annotation_sorted = []
-        if (typeof annotationArray !== 'undefined') {
+        let annotation_sorted = [];
+        if (typeof annotationArray !== "undefined") {
           await Promise.all(
             annotationArray.map(async (item) => {
               const annotationData = await itemServiceFiles.readOne(
                 item.directus_files_id,
                 {
-                  fields: ['id', 'title', 'filename_download']
+                  fields: ["id", "title", "filename_download"],
                 }
-              )
-              annotationDataArray.push(annotationData)
+              );
+              annotationDataArray.push(annotationData);
             })
-          )
+          );
           annotation_sorted = annotationDataArray.sort((a, b) =>
             a.title > b.title ? 1 : -1
-          )
+          );
         }
 
-        let txt_files_sorted = []
-        if (typeof txtArray !== 'undefined') {
+        let txt_files_sorted = [];
+        if (typeof txtArray !== "undefined") {
           await Promise.all(
             txtArray.map(async (item) => {
               const txtData = await itemServiceFiles.readOne(
                 item.directus_files_id,
                 {
-                  fields: ['id', 'title', 'filename_download']
+                  fields: ["id", "title", "filename_download"],
                 }
-              )
-              txtDataArray.push(txtData)
+              );
+              txtDataArray.push(txtData);
             })
-          )
+          );
           txt_files_sorted = txtDataArray.sort((a, b) =>
             a.title > b.title ? 1 : -1
-          )
+          );
         }
 
-        let alto_sorted = []
-        if (typeof altoArray !== 'undefined') {
+        let alto_sorted = [];
+        if (typeof altoArray !== "undefined") {
           await Promise.all(
             altoArray.map(async (item) => {
               const altoData = await itemServiceFiles.readOne(
                 item.directus_files_id,
                 {
-                  fields: ['id', 'title', 'filename_download']
+                  fields: ["id", "title", "filename_download"],
                 }
-              )
-              altoDataArray.push(altoData)
+              );
+              altoDataArray.push(altoData);
             })
-          )
+          );
           alto_sorted = altoDataArray.sort((a, b) =>
             a.title > b.title ? 1 : -1
-          )
+          );
         }
 
         const iiifMetaItems = iiif_meta.map((item) => {
-          const iiifMetaArray = []
-          iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`])
-          return iiifMetaArray
-        })
+          const iiifMetaArray = [];
+          iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`]);
+          return iiifMetaArray;
+        });
         const image_sorted = imageDataArray.sort((a, b) =>
           a.title > b.title ? 1 : -1
-        )
+        );
 
-        const items = createItemArray(image_sorted, annotation_sorted)
+        const items = createItemArray(image_sorted, annotation_sorted);
+        const hasAnnotations = annotation_sorted.length > 0;
 
         res.send(
           createIiifCollectionJson(
@@ -336,10 +351,12 @@ export default {
             items,
             collection,
             fileId,
-            iiifMetaItems
+            iiifMetaItems,
+            true, // sorted
+            hasAnnotations
           )
-        )
+        );
       }
-    )
-  }
-}
+    );
+  },
+};
