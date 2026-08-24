@@ -1,12 +1,19 @@
 # Directus IIIF endpoint
 
-This is work in progress. Currently extension extension adds [IIIF presentation API](https://iiif.io/api/presentation/3.0/) support to Directus media files.
+Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support to Directus media files.
 
 ## URL structure
-- example.org/iiif/manifest/file/<directus-UUID> - returnes simple presentation API 
-- example.org/iiif/manifest/:collection/:id - returns the collection item
+- `example.org/iiif/manifest/:collection/:id` — returns the IIIF manifest for a collection item
+
 ## Requirements
-- Currently extension relies on IIIF_settings table where configuration for collections is set
+- Extension relies on an `IIIF_settings` table where collection configuration is defined. Required fields:
+  - `iiif_collection` — collection name
+  - `iiif_file` — relation field storing images
+  - `iiif_canvas_label` — field used as manifest label
+  - `iiif_meta` — array of Key-Value pairs for manifest metadata
+  - `annotation_files` — related annotation files (JSON/W3C annotations)
+  - `alto_files` — related ALTO XML files
+  - `txt_files` — related plain text files
 ## Updating
 - There is no automatic deployment set up
 - To update the code
