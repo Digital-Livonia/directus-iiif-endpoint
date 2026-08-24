@@ -1,5 +1,7 @@
 # Directus IIIF endpoint
 
+[![CI](https://github.com/Digital-Livonia/directus-iiif-endpoint/actions/workflows/ci.yml/badge.svg)](https://github.com/Digital-Livonia/directus-iiif-endpoint/actions/workflows/ci.yml)
+
 Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support to Directus media files.
 
 ## URL structure
@@ -19,7 +21,7 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
   - `txt_files` — related plain text files
 - `annotation_files`, `alto_files`, and `txt_files` are matched to an image by filename: the image's filename stem (everything before the last `.`) must equal the stem of the related file, e.g. `page001.jpg` ↔ `page001.json` / `page001.xml` / `page001.txt`. Unmatched files are silently skipped for that canvas.
 ## Updating
-- There is no automatic deployment set up
+- CI (`.github/workflows/ci.yml`) runs lint + tests on every push/PR to `master` — deployment itself stays manual, on purpose (no S3/kubeconfig credentials are stored in this repo)
 - To update the code
   - build it locally `npm run build`
   - run `package` script so that `dist` folder is created
