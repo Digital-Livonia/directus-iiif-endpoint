@@ -6,6 +6,9 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
 - `example.org/iiif/manifest/:collection/:id` — returns the IIIF manifest for a collection item
 
 ## Requirements
+- Environment variables:
+  - `PUBLIC_URL` — base URL used to build manifest/canvas/asset ids
+  - `IIIF_SEARCH_URL` — `@id` of the IIIF Content Search service advertised in manifests that have annotations
 - Extension relies on an `IIIF_settings` table where collection configuration is defined. Required fields:
   - `iiif_collection` — collection name
   - `iiif_file` — relation field storing images
@@ -14,6 +17,7 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
   - `annotation_files` — related annotation files (JSON/W3C annotations)
   - `alto_files` — related ALTO XML files
   - `txt_files` — related plain text files
+- `annotation_files`, `alto_files`, and `txt_files` are matched to an image by filename: the image's filename stem (everything before the last `.`) must equal the stem of the related file, e.g. `page001.jpg` ↔ `page001.json` / `page001.xml` / `page001.txt`. Unmatched files are silently skipped for that canvas.
 ## Updating
 - There is no automatic deployment set up
 - To update the code
@@ -28,12 +32,14 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
 npm test
 ```
 
+See [TESTING.md](TESTING.md) for a full, human-readable catalogue of what every test checks.
+
 Tests follow the **SAFe Test Automation Pyramid**:
 
 | Layer | Scope | Location | When to run |
 |---|---|---|---|
 | **Unit** | Pure builder functions (`helpers.js`) | `src/helpers.test.js` | Every commit |
-| **Integration** | Handler + mocked `ItemsService` | `src/handler.test.js` *(planned)* | Every commit |
+| **Integration** | Handler + mocked `ItemsService` | `src/handler.test.js` | Every commit |
 | **API** | Live Directus instance | Manual / CI with env | Before deploy |
 | **E2E** | IIIF viewer loads manifest (Mirador) | Manual | Before release |
 
@@ -51,6 +57,9 @@ When adding new functionality, cover each relevant pyramid layer:
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
+### 1.0.6
+- Canvas `seeAlso` entries for matched ALTO XML and plain-text files (`alto_files`/`txt_files` were read but never surfaced in the manifest before this)
+- **Deploy note**: IIIF Content Search `service.@id` is no longer hardcoded — it now comes from the `IIIF_SEARCH_URL` env var. **Set this in the deployment environment before rolling out 1.0.6**, or the `service` block on manifests with annotations will have `"@id": undefined`.
 ### 1.0.5
 - IIIF content search support for items with annotations
 ### 1.0.4

@@ -1,4 +1,8 @@
 module.exports = {
+  ignorePatterns: [
+    'build/**',
+    'dist/**'
+  ],
   env: {
     browser: true,
     es2021: true
@@ -28,5 +32,10 @@ module.exports = {
     'react'
   ],
   rules: {
+    // Directus field/config names are snake_case throughout this codebase
+    // (IIIF_settings columns like iiif_file, annotation_files,
+    // filename_download); enforcing camelCase would fight the domain, not
+    // catch real bugs.
+    camelcase: 'off'
   }
 }
