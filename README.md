@@ -34,14 +34,23 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
 - restart: `kubectl rollout restart deployment/dl-directus-deployment -n dl-tlu-ee`
 
 ### Dev — `dev-dl-directus-deployment`
-Dev Directus runs on the same cluster, so `dist/` is copied straight into the pod's `/directus/extensions/` instead of going through S3:
+Dev Directus runs on the same cluster, so `dist/` is copied straight into the pod's `/directus/extensions/` instead of going through S3. On a T7/macOS checkout, strip the AppleDouble `._*` files `npm run package` may leave in `dist/` first, or they'll get copied into the pod too:
 ```bash
-POD=$(kubectl get pods -n dl-tlu-ee -l app=dev-dl-directus-deployment -o jsonpath='{.items[0].metadata.name}')
+find dist -name '._*' -delete
+
+POD=$(kubectl get pods -n dl-tlu-ee -l app=dev-dl-directus -o jsonpath='{.items[0].metadata.name}')
 kubectl exec -n dl-tlu-ee "$POD" -- rm -rf /directus/extensions/directus-iiif-endpoint
 kubectl cp dist "$POD":/directus/extensions/directus-iiif-endpoint -n dl-tlu-ee
 kubectl rollout restart deployment/dev-dl-directus-deployment -n dl-tlu-ee
+kubectl rollout status deployment/dev-dl-directus-deployment -n dl-tlu-ee --timeout=90s
 ```
-> The pod label selector above (`app=dev-dl-directus-deployment`) is a best-effort guess — verify it against the actual cluster (`kubectl get pods -n dl-tlu-ee`) before relying on this.
+(pod label is `app=dev-dl-directus` — the deployment is `dev-dl-directus-deployment`, but its pod template uses the shorter label; confirmed against the live cluster 2026-08-25)
+
+After the rollout finishes, check the **new** pod (name changes on restart) picked up the build cleanly — a stale `directus:extension.host` here vs. the actual running Directus version can make the extension fail to register silently:
+```bash
+NEW_POD=$(kubectl get pods -n dl-tlu-ee -l app=dev-dl-directus -o jsonpath='{.items[0].metadata.name}')
+kubectl logs -n dl-tlu-ee "$NEW_POD" --tail=30 | grep -i "extension\|error"
+```
 ## Testing
 
 ```bash
