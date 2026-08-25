@@ -89,6 +89,8 @@ When adding new functionality, cover each relevant pyramid layer:
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
+### 1.0.9
+- `POST /parse-ocr` now rewrites each entry's `canvas`/`manifest` URL to this environment's `PUBLIC_URL` before storing it in `ocr_entries`, instead of keeping whatever origin was baked into the source `annotation_files` JSON at conversion time. Same root cause as the [annotation-highlight known limitation](#requirements) above: the annotation files are shared across environments, so running `/parse-ocr` on dev with files converted against production previously produced search results whose links (`resources[].on`, `resources[].within`) pointed back at production instead of dev.
 ### 1.0.8
 - Added `POST /parse-ocr` and `GET /search/:collection/:file_id` — real IIIF Content Search, backed by a new `ocr_entries` collection. Also switched canvas image bodies to the real IIIF Image API (`IIIF_IMAGE_SERVER` + `ImageService3`, using `filename_disk`) instead of a flat Directus asset URL.
 - **Backstory**: production had been running this functionality since some point after 1.0.5, but the `build/index.js` it was deployed from was hand-edited directly and re-uploaded to S3 — never committed back to `src/`. Recovered on 2026-08-25 by downloading production's actual deployed build from the `dl-tlu-ee` S3/MinIO bucket and de-minifying it; reverse-engineered into proper source, with tests, here. `git log` for this repo has no trace of it before this commit — worth remembering if production's behavior ever again doesn't match what's in `master`.

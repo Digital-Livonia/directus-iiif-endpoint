@@ -170,11 +170,29 @@ export const createIiifCollectionJson = (
   }
 }
 
+// Annotation files are converted upstream (outside this repo) with absolute
+// canvas/manifest URLs baked in for whichever host was current at
+// conversion time. Since annotation files are shared across environments
+// (same file storage), that origin can be wrong for whichever environment
+// is actually running /parse-ocr right now. Rewrite it to directusEndpoint
+// (same PUBLIC_URL every other id in this extension is built from) so
+// search results always link back into the environment that served them,
+// not wherever the file happened to be converted for.
+function rewriteToCurrentOrigin (url, directusEndpoint) {
+  if (typeof url !== 'string' || !url || !directusEndpoint) return url
+  try {
+    const { pathname, search, hash } = new URL(url)
+    return `${directusEndpoint}${pathname}${search}${hash}`
+  } catch {
+    return url
+  }
+}
+
 // Turns one already-fetched W3C/OA annotation list JSON (as stored in the
 // `annotation_files` file assets) into flat rows ready for the `ocr_entries`
 // collection. Pure/testable - no fetch, no Directus service calls here;
 // POST /parse-ocr (index.js) does the fetching and DB writes.
-export function extractOcrEntriesFromAnnotationPage (annotationPage, collectionName, collectionId) {
+export function extractOcrEntriesFromAnnotationPage (annotationPage, collectionName, collectionId, directusEndpoint) {
   const resources = Array.isArray(annotationPage.resources)
     ? annotationPage.resources
     : Array.isArray(annotationPage.items)
@@ -206,8 +224,8 @@ export function extractOcrEntriesFromAnnotationPage (annotationPage, collectionN
       y,
       width,
       height,
-      canvas,
-      manifest,
+      canvas: rewriteToCurrentOrigin(canvas, directusEndpoint),
+      manifest: rewriteToCurrentOrigin(manifest, directusEndpoint),
       collection_name: collectionName,
       collection_id: String(collectionId)
     })

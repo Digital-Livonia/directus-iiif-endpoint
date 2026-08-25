@@ -333,6 +333,34 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
       expect(res.body).toEqual({ success: true, created: 1 })
     })
 
+    it('rewrites canvas/manifest URLs from the source annotation file to this environment\'s PUBLIC_URL', async () => {
+      readByQuery
+        .mockResolvedValueOnce([settingsRow()])
+        .mockResolvedValueOnce([{ annotations: [{ directus_files_id: 'anno-1' }] }])
+        .mockResolvedValueOnce([])
+
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          resources: [{
+            resource: { chars: 'Ampte' },
+            on: 'https://db.dl.tlu.ee/iiif/canvas/1#xywh=1,2,3,4',
+            within: { '@id': 'https://db.dl.tlu.ee/iiif/manifest/books/26' }
+          }]
+        })
+      }))
+      createMany.mockResolvedValueOnce([{ id: 1 }])
+
+      await invoke(baseReq())
+
+      expect(createMany).toHaveBeenCalledWith([
+        expect.objectContaining({
+          canvas: `${BASE}/iiif/canvas/1`,
+          manifest: `${BASE}/iiif/manifest/books/26`
+        })
+      ])
+    })
+
     it('deletes existing ocr_entries for the item before ingesting new ones', async () => {
       readByQuery
         .mockResolvedValueOnce([settingsRow()])

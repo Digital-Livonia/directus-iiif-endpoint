@@ -289,7 +289,7 @@ export default {
           }
           const annotationPage = await response.json()
           ocrEntries = ocrEntries.concat(
-            extractOcrEntriesFromAnnotationPage(annotationPage, collection, id)
+            extractOcrEntriesFromAnnotationPage(annotationPage, collection, id, directusEndpoint)
           )
         }
 

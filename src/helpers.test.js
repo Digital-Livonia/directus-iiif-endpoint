@@ -408,6 +408,46 @@ describe('extractOcrEntriesFromAnnotationPage', () => {
   it('returns an empty array when there are no resources at all', () => {
     expect(extractOcrEntriesFromAnnotationPage({}, 'books', '26')).toEqual([])
   })
+
+  describe('rewriting canvas/manifest origin to the current environment', () => {
+    // annotation_files are converted upstream with an absolute origin baked
+    // in for whichever host was current at conversion time. Since the files
+    // are shared across environments, that origin can point at a different
+    // environment than the one running /parse-ocr right now - it must be
+    // rewritten, or search results end up linking back into the wrong
+    // environment entirely (e.g. dev search results pointing at prod urls).
+    const page = {
+      resources: [
+        {
+          resource: { chars: 'x' },
+          on: region('https://db.dl.tlu.ee/iiif/canvas/1', 10, 20, 30, 40),
+          within: { '@id': 'https://db.dl.tlu.ee/iiif/manifest/magistraat/26' }
+        }
+      ]
+    }
+
+    it('leaves canvas/manifest untouched when no directusEndpoint is given (back-compat)', () => {
+      const [entry] = extractOcrEntriesFromAnnotationPage(page, 'magistraat', '26')
+      expect(entry.canvas).toBe('https://db.dl.tlu.ee/iiif/canvas/1')
+      expect(entry.manifest).toBe('https://db.dl.tlu.ee/iiif/manifest/magistraat/26')
+    })
+
+    it('rewrites the canvas origin to directusEndpoint, keeping the path', () => {
+      const [entry] = extractOcrEntriesFromAnnotationPage(page, 'magistraat', '26', 'https://dev.db.dl.tlu.ee')
+      expect(entry.canvas).toBe('https://dev.db.dl.tlu.ee/iiif/canvas/1')
+    })
+
+    it('rewrites the manifest origin to directusEndpoint, keeping the path', () => {
+      const [entry] = extractOcrEntriesFromAnnotationPage(page, 'magistraat', '26', 'https://dev.db.dl.tlu.ee')
+      expect(entry.manifest).toBe('https://dev.db.dl.tlu.ee/iiif/manifest/magistraat/26')
+    })
+
+    it('leaves a non-URL canvas value untouched rather than throwing', () => {
+      const oddPage = { resources: [{ resource: { chars: 'x' }, on: region('not-a-url', 0, 0, 1, 1) }] }
+      const [entry] = extractOcrEntriesFromAnnotationPage(oddPage, 'books', '26', 'https://dev.db.dl.tlu.ee')
+      expect(entry.canvas).toBe('not-a-url')
+    })
+  })
 })
 
 describe('buildIiifSearchResponse', () => {

@@ -2,11 +2,11 @@
 
 A human-readable catalogue of every automated test in this repo — what it asserts and why. For how to run tests, see [README.md § Testing](README.md#testing). This file mirrors the test suite; if you add or rename a test, update the matching entry here too.
 
-Current totals: **78 tests** across 2 files (`npm test`).
+Current totals: **83 tests** across 2 files (`npm test`).
 
 ---
 
-## Unit layer — `src/helpers.test.js` (56 tests)
+## Unit layer — `src/helpers.test.js` (60 tests)
 
 Tests the pure builder functions in `src/helpers.js` directly, with no Directus involved — fake image/annotation/ALTO/text objects go in, IIIF JSON comes out.
 
@@ -82,6 +82,7 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 - Skips entries with no region (`on`/`target` missing)
 - Skips entries whose `#xywh=` coordinates don't parse to four numbers
 - Returns an empty array when there are no resources at all
+- **Origin rewriting** (annotation files are shared across environments and carry whatever domain they were converted against): with no `directusEndpoint` given, `canvas`/`manifest` are left untouched (back-compat); given a `directusEndpoint`, both are rewritten to that origin while keeping their path; a non-URL `canvas` value (fails to parse as a URL) is left untouched rather than throwing
 
 ### `buildIiifSearchResponse` — builds the IIIF Content Search API v1 response from `ocr_entries` rows
 - `@context` is the IIIF Search API v1 context URL
@@ -94,7 +95,7 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 
 ---
 
-## Integration layer — `src/handler.test.js` (22 tests)
+## Integration layer — `src/handler.test.js` (23 tests)
 
 Tests the actual Directus route handler in `src/index.js`, with `ItemsService` mocked (no real Directus instance). Verifies the full flow: read `IIIF_settings` → read the collection item → read each related file → build the manifest — i.e. that the pieces are wired together correctly, not just that each piece works in isolation.
 
@@ -115,6 +116,7 @@ Tests the actual Directus route handler in `src/index.js`, with `ItemsService` m
 - Falls back to `"annotations"` as the field name when `IIIF_settings` has no row for the collection (mirrors the manifest route's own defaulting)
 - Responds `404` when the collection item has no files in its annotation field
 - Fetches each linked annotation asset (via `GET {origin}/assets/{id}`) and ingests the parsed OCR entries into `ocr_entries`
+- Rewrites each entry's `canvas`/`manifest` URL from whatever origin the source annotation file carries to this environment's `PUBLIC_URL` before storing it
 - Deletes any existing `ocr_entries` rows for that collection+item **before** ingesting new ones (so re-running never leaves stale/duplicate rows)
 - Responds `404` when none of the fetched annotation files contain parseable OCR text (and doesn't call `createMany` in that case)
 
