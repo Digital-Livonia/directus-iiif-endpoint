@@ -22,12 +22,26 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
 - `annotation_files`, `alto_files`, and `txt_files` are matched to an image by filename: the image's filename stem (everything before the last `.`) must equal the stem of the related file, e.g. `page001.jpg` ↔ `page001.json` / `page001.xml` / `page001.txt`. Unmatched files are silently skipped for that canvas.
 ## Updating
 - CI (`.github/workflows/ci.yml`) runs lint + tests on every push/PR to `master` — deployment itself stays manual, on purpose (no S3/kubeconfig credentials are stored in this repo)
-- To update the code
-  - build it locally `npm run build`
-  - run `package` script so that `dist` folder is created
-  - upload the content of `dist` folder to S3 storage via https://console.s3.hpc.ut.ee/ into the folder `extensions`
-  - delete previous version of the folder
-  - restart directus instance `kubectl rollout restart deployment/dl-directus-deployment -n dl-tlu-ee`
+- Directus runs on two instances, both in the `dl-tlu-ee` namespace; both need the same `dist/` folder, just delivered differently. In both cases, start with:
+  ```bash
+  npm run package
+  ```
+  (this runs `npm run build` internally and assembles `dist/` — no need to run `build` separately first)
+
+### Production — `dl-directus-deployment`
+- upload the contents of `dist/` to S3 storage via https://console.s3.hpc.ut.ee/ into the folder `extensions`
+- delete the previous version of the folder there first
+- restart: `kubectl rollout restart deployment/dl-directus-deployment -n dl-tlu-ee`
+
+### Dev — `dev-dl-directus-deployment`
+Dev Directus runs on the same cluster, so `dist/` is copied straight into the pod's `/directus/extensions/` instead of going through S3:
+```bash
+POD=$(kubectl get pods -n dl-tlu-ee -l app=dev-dl-directus-deployment -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n dl-tlu-ee "$POD" -- rm -rf /directus/extensions/directus-extension-directus-iiif-endpoint
+kubectl cp dist "$POD":/directus/extensions/directus-extension-directus-iiif-endpoint -n dl-tlu-ee
+kubectl rollout restart deployment/dev-dl-directus-deployment -n dl-tlu-ee
+```
+> The pod label selector and the extension's folder name (assumed to match the npm package name) above are best-effort — verify both against the actual cluster (`kubectl get pods -n dl-tlu-ee` / `kubectl exec ... -- ls /directus/extensions/`) before relying on this.
 ## Testing
 
 ```bash
