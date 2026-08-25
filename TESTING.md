@@ -2,7 +2,7 @@
 
 A human-readable catalogue of every automated test in this repo — what it asserts and why. For how to run tests, see [README.md § Testing](README.md#testing). This file mirrors the test suite; if you add or rename a test, update the matching entry here too.
 
-Current totals: **83 tests** across 2 files (`npm test`).
+Current totals: **84 tests** across 2 files (`npm test`).
 
 ---
 
@@ -95,7 +95,7 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 
 ---
 
-## Integration layer — `src/handler.test.js` (23 tests)
+## Integration layer — `src/handler.test.js` (24 tests)
 
 Tests the actual Directus route handler in `src/index.js`, with `ItemsService` mocked (no real Directus instance). Verifies the full flow: read `IIIF_settings` → read the collection item → read each related file → build the manifest — i.e. that the pieces are wired together correctly, not just that each piece works in isolation.
 
@@ -118,6 +118,7 @@ Tests the actual Directus route handler in `src/index.js`, with `ItemsService` m
 - Fetches each linked annotation asset (via `GET {origin}/assets/{id}`) and ingests the parsed OCR entries into `ocr_entries`
 - Rewrites each entry's `canvas`/`manifest` URL from whatever origin the source annotation file carries to this environment's `PUBLIC_URL` before storing it
 - Deletes any existing `ocr_entries` rows for that collection+item **before** ingesting new ones (so re-running never leaves stale/duplicate rows)
+- The delete-lookup filters `collection_id` by a **string**, matching the type entries are created with (regression test — this was previously `Number(id)`, silently matching nothing against a text-typed column, so old rows never actually got cleared)
 - Responds `404` when none of the fetched annotation files contain parseable OCR text (and doesn't call `createMany` in that case)
 
 ### `GET /search/:collection/:file_id`

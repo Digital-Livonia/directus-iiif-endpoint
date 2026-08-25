@@ -302,7 +302,7 @@ export default {
           accountability: req.accountability
         })
         const existing = await itemServiceOcr.readByQuery({
-          filter: { collection_name: { _eq: collection }, collection_id: { _eq: Number(id) } },
+          filter: { collection_name: { _eq: collection }, collection_id: { _eq: String(id) } },
           fields: ['id'],
           limit: -1
         })

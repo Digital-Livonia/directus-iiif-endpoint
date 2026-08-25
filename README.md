@@ -89,6 +89,8 @@ When adding new functionality, cover each relevant pyramid layer:
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
+### 1.0.10
+- Fixed `POST /parse-ocr`'s "delete existing entries for this item" lookup: it filtered `collection_id: {_eq: Number(id)}`, but entries are created with `collection_id: String(id)` — a type mismatch that (against a text-typed column) silently matched nothing, so re-running `/parse-ocr` for the same item never actually cleared the old rows; it just accumulated a duplicate set alongside them. This is also present in production's own code (carried over faithfully when 1.0.8 recovered it) — production just never surfaced it as visibly broken, since old and new rows there share the same (correct) domain. Found by re-running `/parse-ocr` on dev after 1.0.9 and seeing search results still link to production despite `ocr_entries.canvas`/`.manifest` supposedly being rewritten on ingest.
 ### 1.0.9
 - `POST /parse-ocr` now rewrites each entry's `canvas`/`manifest` URL to this environment's `PUBLIC_URL` before storing it in `ocr_entries`, instead of keeping whatever origin was baked into the source `annotation_files` JSON at conversion time. Same root cause as the [annotation-highlight known limitation](#requirements) above: the annotation files are shared across environments, so running `/parse-ocr` on dev with files converted against production previously produced search results whose links (`resources[].on`, `resources[].within`) pointed back at production instead of dev.
 ### 1.0.8

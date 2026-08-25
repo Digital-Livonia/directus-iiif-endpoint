@@ -378,6 +378,29 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
       expect(deleteMany).toHaveBeenCalledWith([101, 102])
     })
 
+    it('looks up existing ocr_entries by a string collection_id, matching how entries are created', async () => {
+      // regression test: the delete-lookup filter previously used
+      // Number(id) while createMany stores collection_id as String(id) -
+      // a type mismatch that made the lookup match nothing against a
+      // text-typed column, so old (wrong-origin) rows never got deleted
+      readByQuery
+        .mockResolvedValueOnce([settingsRow()])
+        .mockResolvedValueOnce([{ annotations: [{ directus_files_id: 'anno-1' }] }])
+        .mockResolvedValueOnce([])
+
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ resources: [{ resource: { chars: 'x' }, on: 'c1#xywh=0,0,1,1' }] })
+      }))
+      createMany.mockResolvedValueOnce([{ id: 1 }])
+
+      await invoke(baseReq({ body: { collection: 'books', id: '26' } }))
+
+      expect(readByQuery).toHaveBeenNthCalledWith(3, expect.objectContaining({
+        filter: { collection_name: { _eq: 'books' }, collection_id: { _eq: '26' } }
+      }))
+    })
+
     it('responds 404 when none of the fetched annotation files contain parseable OCR text', async () => {
       readByQuery
         .mockResolvedValueOnce([settingsRow()])
