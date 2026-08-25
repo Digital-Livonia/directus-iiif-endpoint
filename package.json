@@ -14,7 +14,7 @@
 		"type": "endpoint",
 		"path": "build/index.js",
 		"source": "src/index.js",
-		"host": "^9.20.4"
+		"host": "^11.0.0"
 	},
 	"scripts": {
 		"build": "directus-extension build",
@@ -25,7 +25,7 @@
 		"package": "rm -rf dist && mkdir dist && npm run build && cp -r build dist/build && cp package.json dist/ && cp README.md dist/ || true"
 	},
 	"devDependencies": {
-		"@directus/extensions-sdk": "^9.26.0",
+		"@directus/extensions-sdk": "^11.0.10",
 		"eslint": "^8.57.1",
 		"eslint-config-standard": "^17.1.0",
 		"eslint-plugin-import": "^2.31.0",
@@ -33,15 +33,5 @@
 		"eslint-plugin-promise": "^6.6.0",
 		"eslint-plugin-react": "^7.37.1",
 		"vitest": "^4.1.11"
-	},
-	"overrides": {
-		"nanoid": "^5.1.16",
-		"tmp": "^0.2.7",
-		"lodash-es": "^4.18.1",
-		"serialize-javascript": "^7.1.0",
-		"rollup": "^3.30.0",
-		"esbuild": "^0.25.0",
-		"joi": "^17.13.4",
-		"zod": "^3.23.0"
 	}
 }
