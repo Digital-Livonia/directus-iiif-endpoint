@@ -9,7 +9,6 @@ import {
 } from './helpers.js'
 
 const BASE = 'http://test.local'
-const SEARCH_URL = 'http://test.local/api/iiif/search'
 
 const makeImage = (overrides = {}) => ({
   id: 'img-uuid-1',
@@ -248,7 +247,6 @@ describe('createIiifCollectionJson', () => {
     sorted: true,
     hasAnnotations: false,
     directusEndpoint: BASE,
-    searchServiceUrl: SEARCH_URL,
     ...overrides
   })
 
@@ -256,7 +254,7 @@ describe('createIiifCollectionJson', () => {
     const a = args(o)
     return createIiifCollectionJson(
       a.canvasLabel, a.items, a.collection, a.fileId,
-      a.iiifMeta, a.sorted, a.hasAnnotations, a.directusEndpoint, a.searchServiceUrl
+      a.iiifMeta, a.sorted, a.hasAnnotations, a.directusEndpoint
     )
   }
 
@@ -293,14 +291,25 @@ describe('createIiifCollectionJson', () => {
     expect(manifest.service.profile).toBe('http://iiif.io/api/search/1/search')
   })
 
-  it('service @id uses the configured search service URL', () => {
+  it('service @id mirrors the manifest id shape, with /search/ instead of /manifest/', () => {
     const manifest = build({ hasAnnotations: true })
-    expect(manifest.service['@id']).toBe(SEARCH_URL)
+    expect(manifest.service['@id']).toBe(`${BASE}/iiif/search/books/item-uuid`)
   })
 
   it('multiple metadata pairs all appear', () => {
     const manifest = build({ iiifMeta: [['A', '1'], ['B', '2']] })
     expect(manifest.metadata).toHaveLength(2)
+  })
+
+  it('omits metadata rows whose value is null', () => {
+    const manifest = build({ iiifMeta: [['Autor', 'Tammsaare'], ['Fond', null]] })
+    expect(manifest.metadata).toHaveLength(1)
+    expect(manifest.metadata[0].label).toEqual({ et: ['Autor'] })
+  })
+
+  it('omits metadata rows whose value is undefined', () => {
+    const manifest = build({ iiifMeta: [['Autor', 'Tammsaare'], ['Fond', undefined]] })
+    expect(manifest.metadata).toHaveLength(1)
   })
 })
 

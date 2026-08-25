@@ -8,7 +8,6 @@ import {
 } from './helpers.js'
 
 const directusEndpoint = process.env.PUBLIC_URL
-const iiifSearchServiceUrl = process.env.IIIF_SEARCH_URL
 /*
 const createIiifSingleImageJson = (fileId, height, width) => ({
   '@context': 'http://iiif.io/api/presentation/3/context.json',
@@ -237,8 +236,7 @@ export default {
             iiifMetaItems,
             true, // sorted
             hasAnnotations,
-            directusEndpoint,
-            iiifSearchServiceUrl
+            directusEndpoint
           )
         )
       }

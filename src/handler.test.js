@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import iiifExtension from './index.js'
 
-// must match PUBLIC_URL / IIIF_SEARCH_URL set in vitest.config.js
+// must match PUBLIC_URL set in vitest.config.js
 const BASE = 'http://test.local'
-const SEARCH_URL = 'http://test.local/api/iiif/search'
 
 const settingsRow = (overrides = {}) => ({
   iiif_collection: 'books',
@@ -128,6 +127,31 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     ])
   })
 
+  it('omits a metadata row entirely when its underlying field value is null', async () => {
+    readByQuery.mockResolvedValueOnce([
+      settingsRow({
+        iiif_meta: [
+          { Key: 'Autor', Value: 'author_field' },
+          { Key: 'Fond', Value: 'fond_field' }
+        ]
+      })
+    ])
+    readOne
+      .mockResolvedValueOnce({
+        images: [{ directus_files_id: 'file-1' }],
+        title: 'Raamat 1',
+        author_field: 'Tammsaare',
+        fond_field: null
+      })
+      .mockResolvedValueOnce(fileRow())
+
+    await invoke({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
+
+    expect(res.body.metadata).toEqual([
+      { label: { et: ['Autor'] }, value: { et: ['Tammsaare'] } }
+    ])
+  })
+
   it('includes annotations and the search service block when a filename matches an annotation', async () => {
     readByQuery.mockResolvedValueOnce([settingsRow()])
     readOne
@@ -146,7 +170,7 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
       { id: `${BASE}/assets/anno-1.json`, type: 'AnnotationPage' }
     ])
     expect(res.body.service).toBeDefined()
-    expect(res.body.service['@id']).toBe(SEARCH_URL)
+    expect(res.body.service['@id']).toBe(`${BASE}/iiif/search/books/item-1`)
   })
 
   it('omits annotations and the service block when annotation_files is not configured for the collection item', async () => {

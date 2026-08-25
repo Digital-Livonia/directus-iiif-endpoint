@@ -127,13 +127,17 @@ export const createIiifCollectionJson = (
   iiifMeta,
   sorted,
   hasAnnotations = false,
-  directusEndpoint,
-  searchServiceUrl
+  directusEndpoint
 ) => {
-  const iiifMetaItems = iiifMeta.map((item) => ({
-    label: { et: [`${item[0]}`] },
-    value: { et: [`${item[1]}`] }
-  }))
+  // omit metadata rows with no value entirely, rather than showing a
+  // literal "null" - a missing IIIF_settings-configured field means
+  // there's nothing to display, not that "null" is the value
+  const iiifMetaItems = iiifMeta
+    .filter((item) => item[1] !== null && item[1] !== undefined)
+    .map((item) => ({
+      label: { et: [`${item[0]}`] },
+      value: { et: [`${item[1]}`] }
+    }))
 
   return {
     '@context': 'http://iiif.io/api/presentation/3/context.json',
@@ -147,8 +151,11 @@ export const createIiifCollectionJson = (
     items,
     ...(hasAnnotations
       ? {
+          // the actual IIIF Content Search implementation is a sibling
+          // Directus extension mounted at /iiif/search/:collection/:file_id
+          // on this same host - mirrors the manifest's own id shape
           service: {
-            '@id': searchServiceUrl,
+            '@id': `${directusEndpoint}/iiif/search/${collection}/${fileId}`,
             '@context': 'http://iiif.io/api/search/1/context.json',
             profile: 'http://iiif.io/api/search/1/search'
           }

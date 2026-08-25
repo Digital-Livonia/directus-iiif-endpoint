@@ -9,8 +9,8 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
 
 ## Requirements
 - Environment variables:
-  - `PUBLIC_URL` — base URL used to build manifest/canvas/asset ids
-  - `IIIF_SEARCH_URL` — `@id` of the IIIF Content Search service advertised in manifests that have annotations
+  - `PUBLIC_URL` — base URL used to build manifest/canvas/asset ids, and the search service `@id` (see below)
+- The manifest's `service` block (IIIF Content Search v1, only present when the item has annotations) advertises `@id: {PUBLIC_URL}/iiif/search/{collection}/{fileId}` — same shape as the manifest's own `id`, just `/iiif/search/` instead of `/iiif/manifest/`. **This extension does not implement that search route itself** — it's provided by a separate Directus extension mounted on the same host. If that extension isn't deployed on a given instance, the advertised URL will 404 until it is (confirmed missing on dev as of 2026-08-25; present on production at `/iiif/search/:collection/:file_id`).
 - Extension relies on an `IIIF_settings` table where collection configuration is defined. Required fields:
   - `iiif_collection` — collection name
   - `iiif_file` — relation field storing images
@@ -82,9 +82,11 @@ When adding new functionality, cover each relevant pyramid layer:
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
+### 1.0.7
+- Fixed IIIF Content Search `service.@id`: 1.0.6 introduced an `IIIF_SEARCH_URL` env var that was never set on any real deployment, producing `"@id": undefined` in manifests (confirmed live on dev — Mirador's search request ended up requesting a broken `.../undefined?q=...` URL). Compared against production's manifest output directly: the correct `@id` is `{PUBLIC_URL}/iiif/search/{collection}/{fileId}`, mirroring the manifest's own `id` shape. Derived from `PUBLIC_URL` like everything else now; `IIIF_SEARCH_URL` is gone.
+- Metadata rows with a `null` value (e.g. an `IIIF_settings`-configured field that's empty on a given item) are now omitted from the manifest entirely, instead of showing up as a literal `"null"`.
 ### 1.0.6
 - Canvas `seeAlso` entries for matched ALTO XML and plain-text files (`alto_files`/`txt_files` were read but never surfaced in the manifest before this)
-- **Deploy note**: IIIF Content Search `service.@id` is no longer hardcoded — it now comes from the `IIIF_SEARCH_URL` env var. **Set this in the deployment environment before rolling out 1.0.6**, or the `service` block on manifests with annotations will have `"@id": undefined`.
 ### 1.0.5
 - IIIF content search support for items with annotations
 ### 1.0.4
