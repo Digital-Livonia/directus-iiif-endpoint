@@ -2,11 +2,11 @@
 
 A human-readable catalogue of every automated test in this repo — what it asserts and why. For how to run tests, see [README.md § Testing](README.md#testing). This file mirrors the test suite; if you add or rename a test, update the matching entry here too.
 
-Current totals: **49 tests** across 2 files (`npm test`).
+Current totals: **78 tests** across 2 files (`npm test`).
 
 ---
 
-## Unit layer — `src/helpers.test.js` (40 tests)
+## Unit layer — `src/helpers.test.js` (56 tests)
 
 Tests the pure builder functions in `src/helpers.js` directly, with no Directus involved — fake image/annotation/ALTO/text objects go in, IIIF JSON comes out.
 
@@ -27,10 +27,11 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 - Canvas carries the image's `width`/`height` through unchanged
 - Thumbnail `height` is proportionally rounded from `width`/`height`
 
-### `createItemArray` — painting annotation (the actual image content)
+### `createItemArray` — painting annotation (IIIF Image API)
 - Motivation is `"painting"`
 - Body `format` is `image/jpeg`
-- Body `id` uses the asset endpoint with `?format=jpg`
+- Body `id` requests the image through the IIIF Image API (`{IIIF_IMAGE_SERVER}{filename_disk}/full/max/0/default.webp`) — not a flat Directus asset URL
+- Body carries an `ImageService3` service block pointing at `{IIIF_IMAGE_SERVER}{filename_disk}`, `profile: "level1"`
 - Annotation `target` points back to its own canvas id
 
 ### `createItemArray` — rendering (image download link)
@@ -72,9 +73,28 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 - A metadata row whose value is `null` is omitted entirely (not rendered as the string `"null"`)
 - A metadata row whose value is `undefined` is likewise omitted
 
+### `extractOcrEntriesFromAnnotationPage` — turns a fetched annotation-list JSON into `ocr_entries` rows
+- Extracts text + region from a `resources` (IIIF v2 `AnnotationList`) shape
+- Extracts text + region from an `items`/`target`/`body.value` (IIIF v3) shape
+- Falls back to an `annotations` array when neither `resources` nor `items` is present
+- Carries the source manifest id through from `within["@id"]`
+- Skips entries with no usable text (`resource.chars` / `body.value` missing)
+- Skips entries with no region (`on`/`target` missing)
+- Skips entries whose `#xywh=` coordinates don't parse to four numbers
+- Returns an empty array when there are no resources at all
+
+### `buildIiifSearchResponse` — builds the IIIF Content Search API v1 response from `ocr_entries` rows
+- `@context` is the IIIF Search API v1 context URL
+- `@id` echoes the request URL verbatim
+- `within.total` matches the number of entries
+- Each resource is an `oa:Annotation` with `cnt:ContentAsText` matching the entry's text
+- Resource `on` is built from `canvas` + `#xywh=x,y,width,height`
+- Resource `@id` is namespaced under `{directusEndpoint}/iiif/annotation/{entryId}`
+- Each hit references its resource's `@id` and carries the matched text
+
 ---
 
-## Integration layer — `src/handler.test.js` (9 tests)
+## Integration layer — `src/handler.test.js` (22 tests)
 
 Tests the actual Directus route handler in `src/index.js`, with `ItemsService` mocked (no real Directus instance). Verifies the full flow: read `IIIF_settings` → read the collection item → read each related file → build the manifest — i.e. that the pieces are wired together correctly, not just that each piece works in isolation.
 
@@ -86,7 +106,24 @@ Tests the actual Directus route handler in `src/index.js`, with `ItemsService` m
 - A metadata row is omitted entirely when its underlying field value is `null`
 - Annotations and the search `service` block appear when a file's name matches an annotation
 - Annotations and the `service` block are absent when `annotation_files` isn't configured on the collection item
+- The canvas image body is built via the IIIF Image API using `filename_disk` (not `filename_download`), with the `ImageService3` service block
 - `seeAlso` entries for both ALTO and text appear on the canvas when `alto_files`/`txt_files` are configured and filenames match
+
+### `POST /parse-ocr`
+- Route is registered on the router
+- Responds `400` when `collection` or `id` is missing from the request body
+- Falls back to `"annotations"` as the field name when `IIIF_settings` has no row for the collection (mirrors the manifest route's own defaulting)
+- Responds `404` when the collection item has no files in its annotation field
+- Fetches each linked annotation asset (via `GET {origin}/assets/{id}`) and ingests the parsed OCR entries into `ocr_entries`
+- Deletes any existing `ocr_entries` rows for that collection+item **before** ingesting new ones (so re-running never leaves stale/duplicate rows)
+- Responds `404` when none of the fetched annotation files contain parseable OCR text (and doesn't call `createMany` in that case)
+
+### `GET /search/:collection/:file_id`
+- Route is registered on the router
+- Responds `400` when the `q` query parameter is missing
+- Queries `ocr_entries` filtered by `text: {_icontains: q}` scoped to the requested `collection`/`file_id`
+- Returns a full IIIF Search API v1 response built from the matched entries
+- Handles both possible `ItemsService.readByQuery` response shapes (a bare array, or `{ data: [...] }`)
 
 ---
 

@@ -6,11 +6,15 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
 
 ## URL structure
 - `example.org/iiif/manifest/:collection/:id` — returns the IIIF manifest for a collection item
+- `example.org/iiif/search/:collection/:id?q=term` — [IIIF Content Search API v1](https://iiif.io/api/search/1.0/) over that item's OCR text (only meaningful once `/parse-ocr` has been run for it — see below)
+- `POST example.org/iiif/parse-ocr` `{ "collection": "...", "id": "..." }` — parses that item's linked `annotation_files` (W3C/OA AnnotationList JSON, produced by an ALTO→annotation conversion step upstream of this extension) into rows in the `ocr_entries` collection, replacing any previous rows for that item. Run this once per item after (re-)uploading its annotation files, before its search will return anything.
 
 ## Requirements
 - Environment variables:
-  - `PUBLIC_URL` — base URL used to build manifest/canvas/asset ids, and the search service `@id` (see below)
-- The manifest's `service` block (IIIF Content Search v1, only present when the item has annotations) advertises `@id: {PUBLIC_URL}/iiif/search/{collection}/{fileId}` — same shape as the manifest's own `id`, just `/iiif/search/` instead of `/iiif/manifest/`. **This extension does not implement that search route itself** — it's provided by a separate Directus extension mounted on the same host. If that extension isn't deployed on a given instance, the advertised URL will 404 until it is (confirmed missing on dev as of 2026-08-25; present on production at `/iiif/search/:collection/:file_id`).
+  - `PUBLIC_URL` — base URL used to build manifest/canvas/asset ids, and the search service `@id` (derived, not separately configured — see below)
+  - `IIIF_IMAGE_SERVER` — base URL of the IIIF Image API server (e.g. [iiif-convert-and-serve](https://github.com/Digital-Livonia/iiif-convert-and-serve)) that actually serves pixels; canvas `body.id`/`body.service` are built as `{IIIF_IMAGE_SERVER}{filename_disk}/full/max/0/default.webp` + an `ImageService3` service block. In practice this is one shared server across environments (same underlying file storage), so the same value is likely correct everywhere it's deployed — but it must still be set, or image URLs come out as `undefined/...`.
+- The manifest's `service` block (IIIF Content Search v1, only present when the item has annotations) advertises `@id: {PUBLIC_URL}/iiif/search/{collection}/{fileId}` — same shape as the manifest's own `id`, just `/iiif/search/` instead of `/iiif/manifest/`. This route **is** implemented by this extension (`GET /search/:collection/:file_id`, above) — it searches whatever's been ingested into `ocr_entries` via `/parse-ocr`.
+- The `ocr_entries` collection must exist (fields: `text`, `x`, `y`, `width`, `height`, `canvas`, `manifest`, `collection_name`, `collection_id`) — it's a fixed collection name, not something configured per-collection in `IIIF_settings`.
 - Extension relies on an `IIIF_settings` table where collection configuration is defined. Required fields:
   - `iiif_collection` — collection name
   - `iiif_file` — relation field storing images
@@ -82,6 +86,9 @@ When adding new functionality, cover each relevant pyramid layer:
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
+### 1.0.8
+- Added `POST /parse-ocr` and `GET /search/:collection/:file_id` — real IIIF Content Search, backed by a new `ocr_entries` collection. Also switched canvas image bodies to the real IIIF Image API (`IIIF_IMAGE_SERVER` + `ImageService3`, using `filename_disk`) instead of a flat Directus asset URL.
+- **Backstory**: production had been running this functionality since some point after 1.0.5, but the `build/index.js` it was deployed from was hand-edited directly and re-uploaded to S3 — never committed back to `src/`. Recovered on 2026-08-25 by downloading production's actual deployed build from the `dl-tlu-ee` S3/MinIO bucket and de-minifying it; reverse-engineered into proper source, with tests, here. `git log` for this repo has no trace of it before this commit — worth remembering if production's behavior ever again doesn't match what's in `master`.
 ### 1.0.7
 - Fixed IIIF Content Search `service.@id`: 1.0.6 introduced an `IIIF_SEARCH_URL` env var that was never set on any real deployment, producing `"@id": undefined` in manifests (confirmed live on dev — Mirador's search request ended up requesting a broken `.../undefined?q=...` URL). Compared against production's manifest output directly: the correct `@id` is `{PUBLIC_URL}/iiif/search/{collection}/{fileId}`, mirroring the manifest's own `id` shape. Derived from `PUBLIC_URL` like everything else now; `IIIF_SEARCH_URL` is gone.
 - Metadata rows with a `null` value (e.g. an `IIIF_settings`-configured field that's empty on a given item) are now omitted from the manifest entirely, instead of showing up as a literal `"null"`.

@@ -5,15 +5,19 @@ import {
   getAltoSeeAlso,
   getTextSeeAlso,
   createItemArray,
-  createIiifCollectionJson
+  createIiifCollectionJson,
+  extractOcrEntriesFromAnnotationPage,
+  buildIiifSearchResponse
 } from './helpers.js'
 
 const BASE = 'http://test.local'
+const IMAGE_SERVER = 'http://images.test.local/'
 
 const makeImage = (overrides = {}) => ({
   id: 'img-uuid-1',
   title: 'Page 001',
   filename_download: 'page001.jpg',
+  filename_disk: 'img-uuid-1.jpg',
   width: 2000,
   height: 3000,
   type: 'image/jpeg',
@@ -74,67 +78,74 @@ describe('getAnnotations', () => {
 
 describe('createItemArray — canvas structure', () => {
   it('returns one canvas per image', () => {
-    expect(createItemArray([makeImage()], [], BASE)).toHaveLength(1)
+    expect(createItemArray([makeImage()], [], BASE, IMAGE_SERVER)).toHaveLength(1)
   })
 
   it('canvas type is Canvas', () => {
-    const [c] = createItemArray([makeImage()], [], BASE)
+    const [c] = createItemArray([makeImage()], [], BASE, IMAGE_SERVER)
     expect(c.type).toBe('Canvas')
   })
 
   it('canvas id is 1-indexed', () => {
-    const [c] = createItemArray([makeImage()], [], BASE)
+    const [c] = createItemArray([makeImage()], [], BASE, IMAGE_SERVER)
     expect(c.id).toBe(`${BASE}/iiif/canvas/1`)
   })
 
   it('canvas label uses none locale', () => {
-    const [c] = createItemArray([makeImage()], [], BASE)
+    const [c] = createItemArray([makeImage()], [], BASE, IMAGE_SERVER)
     expect(c.label).toEqual({ none: ['1'] })
   })
 
   it('canvas carries correct dimensions', () => {
-    const [c] = createItemArray([makeImage({ width: 1200, height: 800 })], [], BASE)
+    const [c] = createItemArray([makeImage({ width: 1200, height: 800 })], [], BASE, IMAGE_SERVER)
     expect(c.width).toBe(1200)
     expect(c.height).toBe(800)
   })
 
   it('thumbnail height is proportionally rounded', () => {
-    const [c] = createItemArray([makeImage({ width: 1000, height: 2000 })], [], BASE)
+    const [c] = createItemArray([makeImage({ width: 1000, height: 2000 })], [], BASE, IMAGE_SERVER)
     expect(c.thumbnail[0].width).toBe(100)
     expect(c.thumbnail[0].height).toBe(200)
   })
 })
 
-describe('createItemArray — painting annotation', () => {
+describe('createItemArray — painting annotation (IIIF Image API)', () => {
   it('motivation is painting', () => {
-    const [c] = createItemArray([makeImage()], [], BASE)
+    const [c] = createItemArray([makeImage()], [], BASE, IMAGE_SERVER)
     expect(c.items[0].items[0].motivation).toBe('painting')
   })
 
   it('body format is image/jpeg', () => {
-    const [c] = createItemArray([makeImage()], [], BASE)
+    const [c] = createItemArray([makeImage()], [], BASE, IMAGE_SERVER)
     expect(c.items[0].items[0].body.format).toBe('image/jpeg')
   })
 
-  it('body URL uses asset endpoint with jpg format', () => {
-    const [c] = createItemArray([makeImage({ id: 'img-1' })], [], BASE)
-    expect(c.items[0].items[0].body.id).toBe(`${BASE}/assets/img-1?format=jpg`)
+  it('body id requests the image via the IIIF Image API (full/max/0/default.webp)', () => {
+    const [c] = createItemArray([makeImage({ filename_disk: 'abc-123.jpg' })], [], BASE, IMAGE_SERVER)
+    expect(c.items[0].items[0].body.id).toBe(`${IMAGE_SERVER}abc-123.jpg/full/max/0/default.webp`)
+  })
+
+  it('body carries an ImageService3 service block pointing at the image identifier', () => {
+    const [c] = createItemArray([makeImage({ filename_disk: 'abc-123.jpg' })], [], BASE, IMAGE_SERVER)
+    expect(c.items[0].items[0].body.service).toEqual([
+      { type: 'ImageService3', id: `${IMAGE_SERVER}abc-123.jpg`, profile: 'level1' }
+    ])
   })
 
   it('target points to same canvas id', () => {
-    const [c] = createItemArray([makeImage()], [], BASE)
+    const [c] = createItemArray([makeImage()], [], BASE, IMAGE_SERVER)
     expect(c.items[0].items[0].target).toBe(c.id)
   })
 })
 
 describe('createItemArray — rendering', () => {
   it('rendering contains download link with original filename', () => {
-    const [c] = createItemArray([makeImage({ id: 'img-1', filename_download: 'page001.jpg' })], [], BASE)
+    const [c] = createItemArray([makeImage({ id: 'img-1', filename_download: 'page001.jpg' })], [], BASE, IMAGE_SERVER)
     expect(c.rendering[0].id).toBe(`${BASE}/assets/img-1?download=page001.jpg`)
   })
 
   it('rendering label shows uppercased file extension', () => {
-    const [c] = createItemArray([makeImage({ filename_download: 'page001.tif' })], [], BASE)
+    const [c] = createItemArray([makeImage({ filename_download: 'page001.tif' })], [], BASE, IMAGE_SERVER)
     expect(c.rendering[0].label.en[0]).toContain('TIF')
   })
 })
@@ -143,20 +154,20 @@ describe('createItemArray — annotation linking', () => {
   it('canvas includes annotations when filename matched', () => {
     const img = makeImage({ filename_download: 'page001.jpg' })
     const anno = makeAnnotation({ filename_download: 'page001.json' })
-    const [c] = createItemArray([img], [anno], BASE)
+    const [c] = createItemArray([img], [anno], BASE, IMAGE_SERVER)
     expect(c.annotations).toHaveLength(1)
     expect(c.annotations[0].type).toBe('AnnotationPage')
   })
 
   it('canvas omits annotations property when no match', () => {
-    const [c] = createItemArray([makeImage()], [], BASE)
+    const [c] = createItemArray([makeImage()], [], BASE, IMAGE_SERVER)
     expect(c.annotations).toBeUndefined()
   })
 
   it('annotation URL is asset id + .json', () => {
     const img = makeImage({ filename_download: 'page001.jpg' })
     const anno = makeAnnotation({ id: 'anno-42', filename_download: 'page001.json' })
-    const [c] = createItemArray([img], [anno], BASE)
+    const [c] = createItemArray([img], [anno], BASE, IMAGE_SERVER)
     expect(c.annotations[0].id).toBe(`${BASE}/assets/anno-42.json`)
   })
 })
@@ -197,7 +208,7 @@ describe('createItemArray — ALTO/text seeAlso linking', () => {
     const img = makeImage({ filename_download: 'page001.jpg' })
     const alto = makeAlto({ filename_download: 'page001.xml' })
     const txt = makeTxt({ filename_download: 'page001.txt' })
-    const [c] = createItemArray([img], [], BASE, [alto], [txt])
+    const [c] = createItemArray([img], [], BASE, IMAGE_SERVER, [alto], [txt])
     expect(c.seeAlso).toHaveLength(2)
     expect(c.seeAlso.map((s) => s.format)).toEqual(['text/xml', 'text/plain'])
   })
@@ -205,20 +216,20 @@ describe('createItemArray — ALTO/text seeAlso linking', () => {
   it('canvas includes only the matched type when only one is present', () => {
     const img = makeImage({ filename_download: 'page001.jpg' })
     const alto = makeAlto({ filename_download: 'page001.xml' })
-    const [c] = createItemArray([img], [], BASE, [alto], [])
+    const [c] = createItemArray([img], [], BASE, IMAGE_SERVER, [alto], [])
     expect(c.seeAlso).toHaveLength(1)
     expect(c.seeAlso[0].format).toBe('text/xml')
   })
 
   it('canvas omits seeAlso property entirely when no ALTO/text files are configured', () => {
-    const [c] = createItemArray([makeImage()], [], BASE)
+    const [c] = createItemArray([makeImage()], [], BASE, IMAGE_SERVER)
     expect(c.seeAlso).toBeUndefined()
   })
 
   it('canvas omits seeAlso when ALTO/text arrays are present but no filename matches', () => {
     const img = makeImage({ filename_download: 'page001.jpg' })
     const alto = makeAlto({ filename_download: 'other.xml' })
-    const [c] = createItemArray([img], [], BASE, [alto], [])
+    const [c] = createItemArray([img], [], BASE, IMAGE_SERVER, [alto], [])
     expect(c.seeAlso).toBeUndefined()
   })
 })
@@ -229,7 +240,7 @@ describe('createItemArray — multiple images', () => {
       makeImage({ id: 'a', filename_download: 'p1.jpg' }),
       makeImage({ id: 'b', filename_download: 'p2.jpg' })
     ]
-    const items = createItemArray(imgs, [], BASE)
+    const items = createItemArray(imgs, [], BASE, IMAGE_SERVER)
     expect(items[0].id).toBe(`${BASE}/iiif/canvas/1`)
     expect(items[1].id).toBe(`${BASE}/iiif/canvas/2`)
   })
@@ -310,6 +321,151 @@ describe('createIiifCollectionJson', () => {
   it('omits metadata rows whose value is undefined', () => {
     const manifest = build({ iiifMeta: [['Autor', 'Tammsaare'], ['Fond', undefined]] })
     expect(manifest.metadata).toHaveLength(1)
+  })
+})
+
+// ─── Layer 1: Unit — OCR ingest + search ───────────────────────────────────
+
+describe('extractOcrEntriesFromAnnotationPage', () => {
+  const region = (canvas, x, y, w, h) => `${canvas}#xywh=${x},${y},${w},${h}`
+
+  it('extracts text + region from a `resources` (IIIF v2 AnnotationList) shape', () => {
+    const page = {
+      resources: [
+        {
+          resource: { chars: 'Hello world' },
+          on: region('http://test.local/iiif/canvas/1', 10, 20, 100, 30)
+        }
+      ]
+    }
+    const entries = extractOcrEntriesFromAnnotationPage(page, 'books', '26')
+    expect(entries).toEqual([
+      {
+        text: 'Hello world',
+        x: 10,
+        y: 20,
+        width: 100,
+        height: 30,
+        canvas: 'http://test.local/iiif/canvas/1',
+        manifest: '',
+        collection_name: 'books',
+        collection_id: '26'
+      }
+    ])
+  })
+
+  it('extracts text + region from an `items`/`target`/`body.value` (IIIF v3) shape', () => {
+    const page = {
+      items: [
+        {
+          body: { value: 'Tere maailm' },
+          target: region('http://test.local/iiif/canvas/1', 1, 2, 3, 4)
+        }
+      ]
+    }
+    const entries = extractOcrEntriesFromAnnotationPage(page, 'books', '26')
+    expect(entries[0].text).toBe('Tere maailm')
+    expect(entries[0]).toMatchObject({ x: 1, y: 2, width: 3, height: 4 })
+  })
+
+  it('falls back to `annotations` array when neither `resources` nor `items` is present', () => {
+    const page = {
+      annotations: [
+        { resource: { chars: 'x' }, on: region('c1', 0, 0, 1, 1) }
+      ]
+    }
+    expect(extractOcrEntriesFromAnnotationPage(page, 'books', '26')).toHaveLength(1)
+  })
+
+  it('carries the source manifest id through from `within["@id"]`', () => {
+    const page = {
+      resources: [
+        {
+          resource: { chars: 'x' },
+          on: region('c1', 0, 0, 1, 1),
+          within: { '@id': 'http://test.local/iiif/manifest/books/26' }
+        }
+      ]
+    }
+    expect(extractOcrEntriesFromAnnotationPage(page, 'books', '26')[0].manifest).toBe('http://test.local/iiif/manifest/books/26')
+  })
+
+  it('skips entries with no usable text', () => {
+    const page = { resources: [{ resource: {}, on: region('c1', 0, 0, 1, 1) }] }
+    expect(extractOcrEntriesFromAnnotationPage(page, 'books', '26')).toHaveLength(0)
+  })
+
+  it('skips entries with no region (`on`/`target`)', () => {
+    const page = { resources: [{ resource: { chars: 'x' } }] }
+    expect(extractOcrEntriesFromAnnotationPage(page, 'books', '26')).toHaveLength(0)
+  })
+
+  it('skips entries whose xywh coordinates do not parse to four numbers', () => {
+    const page = { resources: [{ resource: { chars: 'x' }, on: 'c1#xywh=1,2,3' }] }
+    expect(extractOcrEntriesFromAnnotationPage(page, 'books', '26')).toHaveLength(0)
+  })
+
+  it('returns an empty array when there are no resources at all', () => {
+    expect(extractOcrEntriesFromAnnotationPage({}, 'books', '26')).toEqual([])
+  })
+})
+
+describe('buildIiifSearchResponse', () => {
+  const entry = (overrides = {}) => ({
+    id: 1,
+    text: 'Hello world',
+    x: 10,
+    y: 20,
+    width: 100,
+    height: 30,
+    canvas: `${BASE}/iiif/canvas/1`,
+    manifest: `${BASE}/iiif/manifest/books/26`,
+    ...overrides
+  })
+
+  it('@context is the IIIF Search API v1 context', () => {
+    const r = buildIiifSearchResponse([], `${BASE}/iiif/search/books/26?q=x`, BASE)
+    expect(r['@context']).toBe('http://iiif.io/api/search/1/context.json')
+  })
+
+  it('@id echoes the request URL', () => {
+    const url = `${BASE}/iiif/search/books/26?q=hello`
+    const r = buildIiifSearchResponse([], url, BASE)
+    expect(r['@id']).toBe(url)
+  })
+
+  it('within.total matches the number of entries', () => {
+    const r = buildIiifSearchResponse([entry(), entry({ id: 2 })], `${BASE}/iiif/search/books/26?q=x`, BASE)
+    expect(r.within).toEqual({ '@type': 'sc:Layer', total: 2 })
+  })
+
+  it('each resource is an oa:Annotation with ContentAsText matching the entry text', () => {
+    const r = buildIiifSearchResponse([entry()], `${BASE}/iiif/search/books/26?q=x`, BASE)
+    expect(r.resources[0]).toMatchObject({
+      '@type': 'oa:Annotation',
+      motivation: 'sc:painting',
+      resource: { '@type': 'cnt:ContentAsText', format: 'text/plain', chars: 'Hello world' }
+    })
+  })
+
+  it('resource `on` is built from canvas + xywh', () => {
+    const r = buildIiifSearchResponse([entry()], `${BASE}/iiif/search/books/26?q=x`, BASE)
+    expect(r.resources[0].on).toBe(`${BASE}/iiif/canvas/1#xywh=10,20,100,30`)
+  })
+
+  it('resource id is namespaced under /iiif/annotation/ on the given endpoint', () => {
+    const r = buildIiifSearchResponse([entry({ id: 42 })], `${BASE}/iiif/search/books/26?q=x`, BASE)
+    expect(r.resources[0]['@id']).toBe(`${BASE}/iiif/annotation/42`)
+  })
+
+  it('each hit references its resource id and carries the matched text', () => {
+    const r = buildIiifSearchResponse([entry({ id: 42 })], `${BASE}/iiif/search/books/26?q=x`, BASE)
+    expect(r.hits[0]).toEqual({
+      '@type': 'search:Hit',
+      match: 'Hello world',
+      annotations: [`${BASE}/iiif/annotation/42`],
+      on: `${BASE}/iiif/canvas/1#xywh=10,20,100,30`
+    })
   })
 })
 

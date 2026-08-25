@@ -4,10 +4,13 @@
 
 import {
   createItemArray,
-  createIiifCollectionJson
+  createIiifCollectionJson,
+  extractOcrEntriesFromAnnotationPage,
+  buildIiifSearchResponse
 } from './helpers.js'
 
 const directusEndpoint = process.env.PUBLIC_URL
+const imageServerUrl = process.env.IIIF_IMAGE_SERVER
 /*
 const createIiifSingleImageJson = (fileId, height, width) => ({
   '@context': 'http://iiif.io/api/presentation/3/context.json',
@@ -152,6 +155,7 @@ export default {
                   'height',
                   'title',
                   'filename_download',
+                  'filename_disk',
                   'author',
                   'date'
                 ]
@@ -224,7 +228,7 @@ export default {
           a.title > b.title ? 1 : -1
         )
 
-        const items = createItemArray(image_sorted, annotation_sorted, directusEndpoint, alto_sorted, txt_files_sorted)
+        const items = createItemArray(image_sorted, annotation_sorted, directusEndpoint, imageServerUrl, alto_sorted, txt_files_sorted)
         const hasAnnotations = annotation_sorted.length > 0
 
         res.send(
@@ -241,5 +245,107 @@ export default {
         )
       }
     )
+
+    router.post('/parse-ocr', async function (req, res, next) {
+      try {
+        const { collection, id } = req.body
+        if (!collection || !id) {
+          return res.status(400).json({ error: '`collection` and `id` are required' })
+        }
+
+        const itemServiceSetting = new ItemsService('IIIF_settings', {
+          schema: req.schema,
+          accountability: req.accountability
+        })
+        const [settings] = await itemServiceSetting.readByQuery({
+          filter: { iiif_collection: { _eq: collection } },
+          fields: ['annotation_files']
+        })
+        const annotationField = (settings && settings.annotation_files) || 'annotations'
+
+        const itemServiceCollection = new ItemsService(collection, {
+          schema: req.schema,
+          accountability: req.accountability
+        })
+        const [collectionItem] = await itemServiceCollection.readByQuery({
+          filter: { id: { _eq: id } },
+          fields: [`${annotationField}.directus_files_id`],
+          deep: { [annotationField]: { _limit: -1 } }
+        })
+        const annotationFiles = Array.isArray(collectionItem[annotationField])
+          ? collectionItem[annotationField]
+          : []
+
+        if (annotationFiles.length === 0) {
+          return res.status(404).json({ error: `No files found in "${annotationField}" for item ${id}` })
+        }
+
+        const requestOrigin = `${req.protocol}://${req.get('host')}`
+        let ocrEntries = []
+        for (const { directus_files_id: fileId } of annotationFiles) {
+          const response = await fetch(`${requestOrigin}/assets/${fileId}`)
+          if (!response.ok) {
+            throw new Error(`Failed to fetch asset ${fileId}: ${response.statusText}`)
+          }
+          const annotationPage = await response.json()
+          ocrEntries = ocrEntries.concat(
+            extractOcrEntriesFromAnnotationPage(annotationPage, collection, id)
+          )
+        }
+
+        if (ocrEntries.length === 0) {
+          return res.status(404).json({ error: 'No valid annotations found in your JSON files' })
+        }
+
+        const itemServiceOcr = new ItemsService('ocr_entries', {
+          schema: req.schema,
+          accountability: req.accountability
+        })
+        const existing = await itemServiceOcr.readByQuery({
+          filter: { collection_name: { _eq: collection }, collection_id: { _eq: Number(id) } },
+          fields: ['id'],
+          limit: -1
+        })
+        const existingIds = (Array.isArray(existing) ? existing : existing.data || []).map((row) => row.id)
+        if (existingIds.length > 0) {
+          await itemServiceOcr.deleteMany(existingIds)
+        }
+
+        const created = await itemServiceOcr.createMany(ocrEntries)
+        res.json({ success: true, created: created.length })
+      } catch (error) {
+        next(error)
+      }
+    })
+
+    router.get('/search/:collection/:file_id', async function (req, res, next) {
+      try {
+        const { collection, file_id: fileId } = req.params
+        const { q } = req.query
+        if (!q) {
+          return res.status(400).json({ error: 'Missing `q` query parameter' })
+        }
+
+        const itemServiceOcr = new ItemsService('ocr_entries', {
+          schema: req.schema,
+          accountability: req.accountability
+        })
+        const results = await itemServiceOcr.readByQuery({
+          filter: {
+            text: { _icontains: q },
+            collection_name: { _eq: collection },
+            collection_id: { _eq: String(fileId) }
+          },
+          limit: 100,
+          fields: ['id', 'text', 'x', 'y', 'width', 'height', 'canvas', 'manifest']
+        })
+        const entries = Array.isArray(results) ? results : results.data || []
+
+        const requestUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`
+        res.json(buildIiifSearchResponse(entries, requestUrl, directusEndpoint))
+      } catch (error) {
+        next(error)
+      }
+    })
   }
 }

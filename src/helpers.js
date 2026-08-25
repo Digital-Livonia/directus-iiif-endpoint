@@ -47,7 +47,7 @@ export function getTextSeeAlso (txtFiles, filename_download, directusEndpoint) {
   } else return null
 }
 
-export const createItemArray = (results, annotations, directusEndpoint, altoFiles = [], txtFiles = []) => {
+export const createItemArray = (results, annotations, directusEndpoint, imageServerUrl, altoFiles = [], txtFiles = []) => {
   const directusAssets = `${directusEndpoint}/assets/`
   const thumbWidth = 100
   return results.map((item, index) => {
@@ -101,11 +101,18 @@ export const createItemArray = (results, annotations, directusEndpoint, altoFile
               type: 'Annotation',
               motivation: 'painting',
               body: {
-                id: `${directusAssets}${item.id}?format=jpg`,
+                id: `${imageServerUrl}${item.filename_disk}/full/max/0/default.webp`,
                 type: 'Image',
                 format: 'image/jpeg',
                 height: item.height,
-                width: item.width
+                width: item.width,
+                service: [
+                  {
+                    type: 'ImageService3',
+                    id: `${imageServerUrl}${item.filename_disk}`,
+                    profile: 'level1'
+                  }
+                ]
               },
               target: `${directusEndpoint}/iiif/canvas/${index + 1}`
             }
@@ -151,9 +158,8 @@ export const createIiifCollectionJson = (
     items,
     ...(hasAnnotations
       ? {
-          // the actual IIIF Content Search implementation is a sibling
-          // Directus extension mounted at /iiif/search/:collection/:file_id
-          // on this same host - mirrors the manifest's own id shape
+          // handled by this same extension's own /search/:collection/:file_id
+          // route (see index.js) - mirrors the manifest's own id shape
           service: {
             '@id': `${directusEndpoint}/iiif/search/${collection}/${fileId}`,
             '@context': 'http://iiif.io/api/search/1/context.json',
@@ -161,5 +167,92 @@ export const createIiifCollectionJson = (
           }
         }
       : {})
+  }
+}
+
+// Turns one already-fetched W3C/OA annotation list JSON (as stored in the
+// `annotation_files` file assets) into flat rows ready for the `ocr_entries`
+// collection. Pure/testable - no fetch, no Directus service calls here;
+// POST /parse-ocr (index.js) does the fetching and DB writes.
+export function extractOcrEntriesFromAnnotationPage (annotationPage, collectionName, collectionId) {
+  const resources = Array.isArray(annotationPage.resources)
+    ? annotationPage.resources
+    : Array.isArray(annotationPage.items)
+      ? annotationPage.items
+      : Array.isArray(annotationPage.annotations)
+        ? annotationPage.annotations
+        : []
+
+  const entries = []
+  for (const resource of resources) {
+    const text = resource.resource?.chars ?? resource.body?.value
+    if (typeof text !== 'string') continue
+
+    const on = resource.on ?? resource.target
+    if (typeof on !== 'string') continue
+
+    const [canvas, xywhPart] = on.split('#xywh=')
+    if (!xywhPart) continue
+
+    const coords = xywhPart.split(',').map(Number)
+    if (coords.length !== 4 || coords.some((n) => Number.isNaN(n))) continue
+
+    const [x, y, width, height] = coords
+    const manifest = resource.within?.['@id'] ?? resource.partOf?.id ?? ''
+
+    entries.push({
+      text,
+      x,
+      y,
+      width,
+      height,
+      canvas,
+      manifest,
+      collection_name: collectionName,
+      collection_id: String(collectionId)
+    })
+  }
+  return entries
+}
+
+// Builds the IIIF Content Search API v1 response from already-queried
+// ocr_entries rows. Pure/testable - GET /search/:collection/:file_id
+// (index.js) does the querying.
+export function buildIiifSearchResponse (entries, requestUrl, directusEndpoint) {
+  const resources = []
+  const hits = []
+
+  for (const entry of entries) {
+    const annId = `${directusEndpoint}/iiif/annotation/${entry.id}`
+    const on = `${entry.canvas}#xywh=${entry.x},${entry.y},${entry.width},${entry.height}`
+
+    resources.push({
+      '@id': annId,
+      '@type': 'oa:Annotation',
+      motivation: 'sc:painting',
+      resource: {
+        '@type': 'cnt:ContentAsText',
+        format: 'text/plain',
+        chars: entry.text
+      },
+      on,
+      within: { '@id': entry.manifest, '@type': 'sc:Manifest' }
+    })
+
+    hits.push({
+      '@type': 'search:Hit',
+      match: entry.text,
+      annotations: [annId],
+      on
+    })
+  }
+
+  return {
+    '@context': 'http://iiif.io/api/search/1/context.json',
+    '@id': requestUrl,
+    '@type': 'sc:AnnotationList',
+    within: { '@type': 'sc:Layer', total: resources.length },
+    resources,
+    hits
   }
 }
