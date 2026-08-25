@@ -8,6 +8,10 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
 - `example.org/iiif/manifest/:collection/:id` — returns the IIIF manifest for a collection item
 - `example.org/iiif/search/:collection/:id?q=term` — [IIIF Content Search API v1](https://iiif.io/api/search/1.0/) over that item's OCR text (only meaningful once `/parse-ocr` has been run for it — see below)
 - `POST example.org/iiif/parse-ocr` `{ "collection": "...", "id": "..." }` — parses that item's linked `annotation_files` (W3C/OA AnnotationList JSON, produced by an ALTO→annotation conversion step upstream of this extension) into rows in the `ocr_entries` collection, replacing any previous rows for that item. Run this once per item after (re-)uploading its annotation files, before its search will return anything.
+  - In practice this is triggered via a **Directus Flow** (manual trigger, run from inside a collection item), not called directly. Configured today for the `magistraat` collection only, as a "Request URL" operation:
+    - Method: `POST`
+    - URL: the environment's own `PUBLIC_URL` + `/iiif/parse-ocr` (e.g. `https://dev.db.dl.tlu.ee/iiif/parse-ocr` on dev, `https://db.dl.tlu.ee/iiif/parse-ocr` on production) — **must be set per-environment when the flow is (re)created**, since the flow's request URL is stored as-is, not derived at run time. This is the same "absolute URL baked in per-environment" trap as `annotation_files`/`ocr_entries.canvas`/`.manifest` (see the known limitation above and the 1.0.9/1.0.10 changelog entries) — if a flow gets copied between environments (e.g. dev mirroring production's flows), this URL needs updating by hand, it won't fix itself.
+    - Request body: `{"collection":"magistraat","id":{{$last.body.keys[0]}}}` — `{{$last.body.keys[0]}}` is Directus's own flow templating syntax for "the primary key of the item the flow was manually triggered from".
 
 ## Requirements
 - Environment variables:
