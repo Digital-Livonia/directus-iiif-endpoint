@@ -37,11 +37,11 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
 Dev Directus runs on the same cluster, so `dist/` is copied straight into the pod's `/directus/extensions/` instead of going through S3:
 ```bash
 POD=$(kubectl get pods -n dl-tlu-ee -l app=dev-dl-directus-deployment -o jsonpath='{.items[0].metadata.name}')
-kubectl exec -n dl-tlu-ee "$POD" -- rm -rf /directus/extensions/directus-extension-directus-iiif-endpoint
-kubectl cp dist "$POD":/directus/extensions/directus-extension-directus-iiif-endpoint -n dl-tlu-ee
+kubectl exec -n dl-tlu-ee "$POD" -- rm -rf /directus/extensions/directus-iiif-endpoint
+kubectl cp dist "$POD":/directus/extensions/directus-iiif-endpoint -n dl-tlu-ee
 kubectl rollout restart deployment/dev-dl-directus-deployment -n dl-tlu-ee
 ```
-> The pod label selector and the extension's folder name (assumed to match the npm package name) above are best-effort — verify both against the actual cluster (`kubectl get pods -n dl-tlu-ee` / `kubectl exec ... -- ls /directus/extensions/`) before relying on this.
+> The pod label selector above (`app=dev-dl-directus-deployment`) is a best-effort guess — verify it against the actual cluster (`kubectl get pods -n dl-tlu-ee`) before relying on this.
 ## Testing
 
 ```bash
