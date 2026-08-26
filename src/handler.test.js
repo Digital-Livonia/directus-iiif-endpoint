@@ -517,7 +517,7 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
         json: async () => ({
           '@id': 'https://db.dl.tlu.ee/iiif/0001_001.json',
           resources: [{
-            resource: { chars: 'x' },
+            resource: { '@id': 'https://db.dl.tlu.ee/iiif/0001_001.json-1', chars: 'x' },
             on: 'https://db.dl.tlu.ee/iiif/canvas/1#xywh=1,2,3,4',
             within: { '@id': 'https://db.dl.tlu.ee/iiif/manifest/books/26' }
           }]
@@ -529,6 +529,11 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
       expect(res.body['@id']).toBe(`${BASE}/iiif/0001_001.json`)
       expect(res.body.resources[0].on).toBe(`${BASE}/iiif/canvas/1#xywh=1,2,3,4`)
       expect(res.body.resources[0].within['@id']).toBe(`${BASE}/iiif/manifest/books/26`)
+      // regression: this nested id is what Mirador falls back to as the
+      // annotation's own identity (e.g. tracking "selected annotation" in
+      // the sidebar) when the outer annotation has no id of its own -
+      // missed on the first pass, crashed Mirador after 1.0.11 shipped
+      expect(res.body.resources[0].resource['@id']).toBe(`${BASE}/iiif/0001_001.json-1`)
     })
 
     it('fetches the asset from this same host\'s /assets/:fileId', async () => {

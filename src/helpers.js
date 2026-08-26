@@ -201,6 +201,8 @@ export function rewriteAnnotationPageOrigin (annotationPage, directusEndpoint) {
 
   const rewriteResource = (resource) => {
     const rewritten = { ...resource }
+    if (typeof resource.id === 'string') rewritten.id = rewriteToCurrentOrigin(resource.id, directusEndpoint)
+    if (typeof resource['@id'] === 'string') rewritten['@id'] = rewriteToCurrentOrigin(resource['@id'], directusEndpoint)
     if (typeof resource.on === 'string') rewritten.on = rewriteToCurrentOrigin(resource.on, directusEndpoint)
     if (typeof resource.target === 'string') rewritten.target = rewriteToCurrentOrigin(resource.target, directusEndpoint)
     if (resource.within?.['@id']) {
@@ -208,6 +210,19 @@ export function rewriteAnnotationPageOrigin (annotationPage, directusEndpoint) {
     }
     if (resource.partOf?.id) {
       rewritten.partOf = { ...resource.partOf, id: rewriteToCurrentOrigin(resource.partOf.id, directusEndpoint) }
+    }
+    // the nested content object (v2: `resource`, v3: `body`) can carry its
+    // own @id/id too - Mirador falls back to this as the annotation's
+    // identity when the outer annotation has none of its own, e.g. to track
+    // "currently selected annotation" in the sidebar panel. Missing this
+    // was the actual cause of a Mirador crash (reading .targetId of
+    // undefined) after 1.0.11 shipped - the outer on/within were already
+    // rewritten, but this nested id wasn't, so it still pointed elsewhere.
+    if (resource.resource?.['@id']) {
+      rewritten.resource = { ...resource.resource, '@id': rewriteToCurrentOrigin(resource.resource['@id'], directusEndpoint) }
+    }
+    if (resource.body?.id) {
+      rewritten.body = { ...resource.body, id: rewriteToCurrentOrigin(resource.body.id, directusEndpoint) }
     }
     return rewritten
   }

@@ -544,14 +544,21 @@ describe('rewriteAnnotationPageOrigin', () => {
     expect(r.resources[0].within).toEqual({ '@id': `${BASE}/iiif/manifest/magistraat/26`, '@type': 'sc:Manifest' })
   })
 
-  it('leaves everything else about a resource untouched (e.g. resource.chars, resource["@id"])', () => {
+  it('rewrites the nested resource["@id"] too - Mirador falls back to this as the annotation\'s own identity (e.g. "selected annotation" tracking) when the outer annotation has no id of its own', () => {
     const r = rewriteAnnotationPageOrigin(page(), BASE)
     expect(r.resources[0].resource).toEqual({
-      '@id': 'https://db.dl.tlu.ee/iiif/0001_001.json-1',
+      '@id': `${BASE}/iiif/0001_001.json-1`,
       '@type': 'cnt:ContentAsText',
       format: 'text/plain',
       chars: 'Der Henneppspinner'
     })
+  })
+
+  it('rewrites an IIIF v3 nested body.id the same way', () => {
+    const v3Page = { items: [{ body: { id: 'https://db.dl.tlu.ee/iiif/anno-1', value: 'x' }, target: 'c1#xywh=0,0,1,1' }] }
+    const r = rewriteAnnotationPageOrigin(v3Page, BASE)
+    expect(r.items[0].body.id).toBe(`${BASE}/iiif/anno-1`)
+    expect(r.items[0].body.value).toBe('x')
   })
 
   it('also rewrites an IIIF v3 `target`/`partOf.id` shape', () => {

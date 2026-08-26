@@ -95,6 +95,8 @@ When adding new functionality, cover each relevant pyramid layer:
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
+### 1.0.12
+- Fixed a Mirador crash (`Cannot read properties of undefined (reading 'targetId')`) introduced by 1.0.11: `GET /iiif/annotation-page/:fileId` rewrote `on`/`within`/`target`/`partOf.id` but missed the nested content object's own id (`resource["@id"]` in v2, `body.id` in v3) — Mirador falls back to that nested id as the annotation's identity (e.g. tracking the currently-selected annotation in the sidebar) when the outer annotation has none of its own. `rewriteAnnotationPageOrigin` now rewrites that too.
 ### 1.0.11
 - Added `GET /iiif/annotation-page/:fileId`: proxies an `annotation_files` asset and rewrites its `on`/`within`/`target`/`partOf.id` URLs to this environment's `PUBLIC_URL`. Canvas `annotations[]` now links here instead of the raw Directus asset — fixes annotation highlight boxes not rendering on dev (same shared-file-storage-with-baked-in-domain problem as 1.0.9/1.0.10, now fixed at the source of the manifest link rather than only for `ocr_entries`).
 ### 1.0.10

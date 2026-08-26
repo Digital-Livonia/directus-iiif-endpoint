@@ -2,11 +2,11 @@
 
 A human-readable catalogue of every automated test in this repo — what it asserts and why. For how to run tests, see [README.md § Testing](README.md#testing). This file mirrors the test suite; if you add or rename a test, update the matching entry here too.
 
-Current totals: **95 tests** across 2 files (`npm test`).
+Current totals: **96 tests** across 2 files (`npm test`).
 
 ---
 
-## Unit layer — `src/helpers.test.js` (67 tests)
+## Unit layer — `src/helpers.test.js` (68 tests)
 
 Tests the pure builder functions in `src/helpers.js` directly, with no Directus involved — fake image/annotation/ALTO/text objects go in, IIIF JSON comes out.
 
@@ -97,7 +97,8 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 - Rewrites the annotation page's own top-level `id`/`@id`
 - Rewrites each resource's `on` target, keeping the `#xywh=` fragment
 - Rewrites each resource's `within["@id"]`, preserving any other `within` fields
-- Leaves everything else about a resource untouched (e.g. `resource.chars`, `resource["@id"]`)
+- Rewrites the nested content object's own id too (v2: `resource["@id"]`, v3: `body.id`) — Mirador falls back to this as the annotation's identity (e.g. "selected annotation" tracking) when the outer annotation has none of its own; missing this crashed Mirador after 1.0.11 shipped (regression test)
+- Leaves everything else about a resource untouched (e.g. `resource.chars`)
 - Also handles an IIIF v3 shape (`target`/`partOf.id`), not just v2 (`on`/`within`)
 - Returns the input unchanged when no `directusEndpoint` is given (back-compat)
 - Does not mutate the input object
@@ -139,7 +140,7 @@ Tests the actual Directus route handler in `src/index.js`, with `ItemsService` m
 
 ### `GET /annotation-page/:fileId`
 - Route is registered on the router
-- Fetches the raw asset and returns it with `on`/`within`/`target`/`partOf.id` rewritten to this environment's `PUBLIC_URL`
+- Fetches the raw asset and returns it with `on`/`within`/`target`/`partOf.id` rewritten to this environment's `PUBLIC_URL`, **including the nested content object's own id** (`resource["@id"]`/`body.id` — regression test, see `rewriteAnnotationPageOrigin` above)
 - Fetches the asset from this same host's `/assets/:fileId` (not a hardcoded or cross-environment URL)
 - Forwards a non-`ok` upstream status (e.g. `404`) instead of throwing
 
