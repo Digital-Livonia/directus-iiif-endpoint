@@ -196,7 +196,7 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
 
     expect(res.body.items[0].annotations).toEqual([
-      { id: `${BASE}/assets/anno-1.json`, type: 'AnnotationPage' }
+      { id: `${BASE}/iiif/annotation-page/anno-1`, type: 'AnnotationPage' }
     ])
     expect(res.body.service).toBeDefined()
     expect(res.body.service['@id']).toBe(`${BASE}/iiif/search/books/item-1`)
@@ -489,6 +489,64 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
       await invoke(baseReq())
 
       expect(res.body.resources).toHaveLength(1)
+    })
+  })
+
+  // ─── GET /annotation-page/:fileId ───────────────────────────────────────
+
+  describe('GET /annotation-page/:fileId', () => {
+    const invoke = (req) => router.routes.get['/annotation-page/:fileId'](req, res, next)
+    const baseReq = (overrides = {}) => ({
+      params: { fileId: 'anno-1' },
+      protocol: 'https',
+      get: (header) => (header === 'host' ? 'test.local' : undefined),
+      ...overrides
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('registers the /annotation-page/:fileId route', () => {
+      expect(router.routes.get['/annotation-page/:fileId']).toBeTypeOf('function')
+    })
+
+    it('fetches the raw asset and returns it with on/within rewritten to this environment', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          '@id': 'https://db.dl.tlu.ee/iiif/0001_001.json',
+          resources: [{
+            resource: { chars: 'x' },
+            on: 'https://db.dl.tlu.ee/iiif/canvas/1#xywh=1,2,3,4',
+            within: { '@id': 'https://db.dl.tlu.ee/iiif/manifest/books/26' }
+          }]
+        })
+      }))
+
+      await invoke(baseReq())
+
+      expect(res.body['@id']).toBe(`${BASE}/iiif/0001_001.json`)
+      expect(res.body.resources[0].on).toBe(`${BASE}/iiif/canvas/1#xywh=1,2,3,4`)
+      expect(res.body.resources[0].within['@id']).toBe(`${BASE}/iiif/manifest/books/26`)
+    })
+
+    it('fetches the asset from this same host\'s /assets/:fileId', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ resources: [] }) })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await invoke(baseReq())
+
+      expect(fetchMock).toHaveBeenCalledWith('https://test.local/assets/anno-1')
+    })
+
+    it('forwards a non-ok upstream status instead of throwing', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
+
+      await invoke(baseReq())
+
+      expect(res.statusCode).toBe(404)
+      expect(res.body.error).toMatch(/anno-1/)
     })
   })
 })

@@ -6,7 +6,8 @@ import {
   createItemArray,
   createIiifCollectionJson,
   extractOcrEntriesFromAnnotationPage,
-  buildIiifSearchResponse
+  buildIiifSearchResponse,
+  rewriteAnnotationPageOrigin
 } from './helpers.js'
 
 const directusEndpoint = process.env.PUBLIC_URL
@@ -343,6 +344,21 @@ export default {
 
         const requestUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`
         res.json(buildIiifSearchResponse(entries, requestUrl, directusEndpoint))
+      } catch (error) {
+        next(error)
+      }
+    })
+
+    router.get('/annotation-page/:fileId', async function (req, res, next) {
+      try {
+        const { fileId } = req.params
+        const requestOrigin = `${req.protocol}://${req.get('host')}`
+        const response = await fetch(`${requestOrigin}/assets/${fileId}`)
+        if (!response.ok) {
+          return res.status(response.status).json({ error: `Failed to fetch asset ${fileId}` })
+        }
+        const annotationPage = await response.json()
+        res.json(rewriteAnnotationPageOrigin(annotationPage, directusEndpoint))
       } catch (error) {
         next(error)
       }

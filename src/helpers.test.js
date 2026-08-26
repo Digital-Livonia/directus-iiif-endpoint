@@ -7,7 +7,8 @@ import {
   createItemArray,
   createIiifCollectionJson,
   extractOcrEntriesFromAnnotationPage,
-  buildIiifSearchResponse
+  buildIiifSearchResponse,
+  rewriteAnnotationPageOrigin
 } from './helpers.js'
 
 const BASE = 'http://test.local'
@@ -64,9 +65,9 @@ describe('findIdByFile', () => {
 })
 
 describe('getAnnotations', () => {
-  it('returns AnnotationPage with correct asset URL when found', () => {
+  it('returns AnnotationPage pointing at this extension\'s own rewriting route, not the raw asset', () => {
     expect(getAnnotations([makeAnnotation()], 'page001.json', BASE)).toEqual({
-      id: `${BASE}/assets/anno-uuid-1.json`,
+      id: `${BASE}/iiif/annotation-page/anno-uuid-1`,
       type: 'AnnotationPage'
     })
   })
@@ -164,11 +165,11 @@ describe('createItemArray — annotation linking', () => {
     expect(c.annotations).toBeUndefined()
   })
 
-  it('annotation URL is asset id + .json', () => {
+  it('annotation URL points at the annotation-page rewriting route, not the raw asset', () => {
     const img = makeImage({ filename_download: 'page001.jpg' })
     const anno = makeAnnotation({ id: 'anno-42', filename_download: 'page001.json' })
     const [c] = createItemArray([img], [anno], BASE, IMAGE_SERVER)
-    expect(c.annotations[0].id).toBe(`${BASE}/assets/anno-42.json`)
+    expect(c.annotations[0].id).toBe(`${BASE}/iiif/annotation-page/anno-42`)
   })
 })
 
@@ -506,6 +507,80 @@ describe('buildIiifSearchResponse', () => {
       annotations: [`${BASE}/iiif/annotation/42`],
       on: `${BASE}/iiif/canvas/1#xywh=10,20,100,30`
     })
+  })
+})
+
+describe('rewriteAnnotationPageOrigin', () => {
+  // same shared-storage problem as ocr_entries: annotation_files carry
+  // whatever origin they were converted against, which can differ from the
+  // environment actually serving them right now.
+  const page = () => ({
+    '@context': 'http://iiif.io/api/presentation/2/context.json',
+    '@id': 'https://db.dl.tlu.ee/iiif/0001_001.json',
+    '@type': 'sc:AnnotationList',
+    resources: [
+      {
+        '@type': 'oa:Annotation',
+        motivation: 'sc:painting',
+        resource: { '@id': 'https://db.dl.tlu.ee/iiif/0001_001.json-1', '@type': 'cnt:ContentAsText', format: 'text/plain', chars: 'Der Henneppspinner' },
+        on: 'https://db.dl.tlu.ee/iiif/canvas/1#xywh=1210,752,1392,210',
+        within: { '@id': 'https://db.dl.tlu.ee/iiif/manifest/magistraat/26', '@type': 'sc:Manifest' }
+      }
+    ]
+  })
+
+  it('rewrites the annotation page\'s own top-level id/@id', () => {
+    const r = rewriteAnnotationPageOrigin(page(), BASE)
+    expect(r['@id']).toBe(`${BASE}/iiif/0001_001.json`)
+  })
+
+  it('rewrites each resource\'s `on` target, keeping the #xywh= fragment', () => {
+    const r = rewriteAnnotationPageOrigin(page(), BASE)
+    expect(r.resources[0].on).toBe(`${BASE}/iiif/canvas/1#xywh=1210,752,1392,210`)
+  })
+
+  it('rewrites each resource\'s `within["@id"]`, preserving other within fields', () => {
+    const r = rewriteAnnotationPageOrigin(page(), BASE)
+    expect(r.resources[0].within).toEqual({ '@id': `${BASE}/iiif/manifest/magistraat/26`, '@type': 'sc:Manifest' })
+  })
+
+  it('leaves everything else about a resource untouched (e.g. resource.chars, resource["@id"])', () => {
+    const r = rewriteAnnotationPageOrigin(page(), BASE)
+    expect(r.resources[0].resource).toEqual({
+      '@id': 'https://db.dl.tlu.ee/iiif/0001_001.json-1',
+      '@type': 'cnt:ContentAsText',
+      format: 'text/plain',
+      chars: 'Der Henneppspinner'
+    })
+  })
+
+  it('also rewrites an IIIF v3 `target`/`partOf.id` shape', () => {
+    const v3Page = {
+      id: 'https://db.dl.tlu.ee/iiif/page.json',
+      items: [
+        {
+          body: { value: 'x' },
+          target: 'https://db.dl.tlu.ee/iiif/canvas/1#xywh=0,0,1,1',
+          partOf: { id: 'https://db.dl.tlu.ee/iiif/manifest/books/1' }
+        }
+      ]
+    }
+    const r = rewriteAnnotationPageOrigin(v3Page, BASE)
+    expect(r.id).toBe(`${BASE}/iiif/page.json`)
+    expect(r.items[0].target).toBe(`${BASE}/iiif/canvas/1#xywh=0,0,1,1`)
+    expect(r.items[0].partOf.id).toBe(`${BASE}/iiif/manifest/books/1`)
+  })
+
+  it('returns the input unchanged when no directusEndpoint is given (back-compat)', () => {
+    const input = page()
+    expect(rewriteAnnotationPageOrigin(input, undefined)).toBe(input)
+  })
+
+  it('does not mutate the input object', () => {
+    const input = page()
+    const originalOn = input.resources[0].on
+    rewriteAnnotationPageOrigin(input, BASE)
+    expect(input.resources[0].on).toBe(originalOn)
   })
 })
 

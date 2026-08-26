@@ -2,11 +2,11 @@
 
 A human-readable catalogue of every automated test in this repo — what it asserts and why. For how to run tests, see [README.md § Testing](README.md#testing). This file mirrors the test suite; if you add or rename a test, update the matching entry here too.
 
-Current totals: **84 tests** across 2 files (`npm test`).
+Current totals: **95 tests** across 2 files (`npm test`).
 
 ---
 
-## Unit layer — `src/helpers.test.js` (60 tests)
+## Unit layer — `src/helpers.test.js` (67 tests)
 
 Tests the pure builder functions in `src/helpers.js` directly, with no Directus involved — fake image/annotation/ALTO/text objects go in, IIIF JSON comes out.
 
@@ -16,7 +16,7 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 - Returns `false` for an empty list
 
 ### `getAnnotations` — builds the `AnnotationPage` link for a matched `.json` annotation file
-- Returns an `AnnotationPage` object with the correct asset URL when a match is found
+- Returns an `AnnotationPage` object pointing at this extension's own `/iiif/annotation-page/:fileId` rewriting route (not the raw asset URL) when a match is found
 - Returns `null` when no annotation matches
 
 ### `createItemArray` — canvas structure
@@ -41,7 +41,7 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 ### `createItemArray` — annotation linking
 - Canvas includes `annotations` when a `.json` file's stem matches the image's stem
 - Canvas **omits** the `annotations` property entirely when there's no match (not `null` — absent)
-- Matched annotation URL is `{assetBase}{id}.json`
+- Matched annotation URL points at `/iiif/annotation-page/{id}` (this extension's own rewriting route), not the raw asset
 
 ### `getAltoSeeAlso` — builds a `seeAlso` Dataset entry for a matched ALTO XML file
 - Returns a `Dataset` entry (with ALTO namespace `profile`, `format: text/xml`) when matched
@@ -93,9 +93,18 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 - Resource `@id` is namespaced under `{directusEndpoint}/iiif/annotation/{entryId}`
 - Each hit references its resource's `@id` and carries the matched text
 
+### `rewriteAnnotationPageOrigin` — same origin fix as above, applied to a whole raw annotation page
+- Rewrites the annotation page's own top-level `id`/`@id`
+- Rewrites each resource's `on` target, keeping the `#xywh=` fragment
+- Rewrites each resource's `within["@id"]`, preserving any other `within` fields
+- Leaves everything else about a resource untouched (e.g. `resource.chars`, `resource["@id"]`)
+- Also handles an IIIF v3 shape (`target`/`partOf.id`), not just v2 (`on`/`within`)
+- Returns the input unchanged when no `directusEndpoint` is given (back-compat)
+- Does not mutate the input object
+
 ---
 
-## Integration layer — `src/handler.test.js` (24 tests)
+## Integration layer — `src/handler.test.js` (28 tests)
 
 Tests the actual Directus route handler in `src/index.js`, with `ItemsService` mocked (no real Directus instance). Verifies the full flow: read `IIIF_settings` → read the collection item → read each related file → build the manifest — i.e. that the pieces are wired together correctly, not just that each piece works in isolation.
 
@@ -127,6 +136,12 @@ Tests the actual Directus route handler in `src/index.js`, with `ItemsService` m
 - Queries `ocr_entries` filtered by `text: {_icontains: q}` scoped to the requested `collection`/`file_id`
 - Returns a full IIIF Search API v1 response built from the matched entries
 - Handles both possible `ItemsService.readByQuery` response shapes (a bare array, or `{ data: [...] }`)
+
+### `GET /annotation-page/:fileId`
+- Route is registered on the router
+- Fetches the raw asset and returns it with `on`/`within`/`target`/`partOf.id` rewritten to this environment's `PUBLIC_URL`
+- Fetches the asset from this same host's `/assets/:fileId` (not a hardcoded or cross-environment URL)
+- Forwards a non-`ok` upstream status (e.g. `404`) instead of throwing
 
 ---
 

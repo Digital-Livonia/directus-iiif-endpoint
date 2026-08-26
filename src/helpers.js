@@ -5,12 +5,15 @@ export function findIdByFile (annotations, filename_download) {
   return annotation ? annotation.id : false
 }
 
+// Points at this extension's own /annotation-page/:fileId route rather than
+// the raw stored asset, so the annotation content gets origin-rewritten on
+// every request (see rewriteAnnotationPageOrigin below) instead of forever
+// carrying whatever domain it was converted against.
 export function getAnnotations (annotations, filename_download, directusEndpoint) {
-  const directusAssets = `${directusEndpoint}/assets/`
   const annoId = findIdByFile(annotations, filename_download)
   if (annoId) {
     return {
-      id: `${directusAssets}${annoId}.json`,
+      id: `${directusEndpoint}/iiif/annotation-page/${annoId}`,
       type: 'AnnotationPage'
     }
   } else return null
@@ -178,7 +181,7 @@ export const createIiifCollectionJson = (
 // (same PUBLIC_URL every other id in this extension is built from) so
 // search results always link back into the environment that served them,
 // not wherever the file happened to be converted for.
-function rewriteToCurrentOrigin (url, directusEndpoint) {
+export function rewriteToCurrentOrigin (url, directusEndpoint) {
   if (typeof url !== 'string' || !url || !directusEndpoint) return url
   try {
     const { pathname, search, hash } = new URL(url)
@@ -186,6 +189,43 @@ function rewriteToCurrentOrigin (url, directusEndpoint) {
   } catch {
     return url
   }
+}
+
+// Same fix as extractOcrEntriesFromAnnotationPage above, applied to a whole
+// annotation page instead of flattened ocr_entries rows - used by
+// GET /annotation-page/:fileId (index.js) so canvas.annotations[] links
+// always resolve to the current environment, not wherever the file was
+// converted for. Returns a new object; doesn't mutate the input.
+export function rewriteAnnotationPageOrigin (annotationPage, directusEndpoint) {
+  if (!directusEndpoint) return annotationPage
+
+  const rewriteResource = (resource) => {
+    const rewritten = { ...resource }
+    if (typeof resource.on === 'string') rewritten.on = rewriteToCurrentOrigin(resource.on, directusEndpoint)
+    if (typeof resource.target === 'string') rewritten.target = rewriteToCurrentOrigin(resource.target, directusEndpoint)
+    if (resource.within?.['@id']) {
+      rewritten.within = { ...resource.within, '@id': rewriteToCurrentOrigin(resource.within['@id'], directusEndpoint) }
+    }
+    if (resource.partOf?.id) {
+      rewritten.partOf = { ...resource.partOf, id: rewriteToCurrentOrigin(resource.partOf.id, directusEndpoint) }
+    }
+    return rewritten
+  }
+
+  const key = Array.isArray(annotationPage.resources)
+    ? 'resources'
+    : Array.isArray(annotationPage.items)
+      ? 'items'
+      : Array.isArray(annotationPage.annotations)
+        ? 'annotations'
+        : null
+
+  const rewritten = { ...annotationPage }
+  if (typeof annotationPage.id === 'string') rewritten.id = rewriteToCurrentOrigin(annotationPage.id, directusEndpoint)
+  if (typeof annotationPage['@id'] === 'string') rewritten['@id'] = rewriteToCurrentOrigin(annotationPage['@id'], directusEndpoint)
+  if (key) rewritten[key] = annotationPage[key].map(rewriteResource)
+
+  return rewritten
 }
 
 // Turns one already-fetched W3C/OA annotation list JSON (as stored in the
