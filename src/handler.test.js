@@ -252,6 +252,45 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     ])
   })
 
+  describe('missing-data guards (regression: used to hang instead of 404)', () => {
+    // Found on production: requesting a since-deleted item's manifest hung
+    // the connection forever instead of returning an error. Root cause: no
+    // try/catch around the async handler, plus destructuring/indexing
+    // straight into a possibly-undefined result. Any one of these guards
+    // failing would reintroduce the hang.
+
+    it('responds 404 (not hang) when no IIIF_settings row matches the collection', async () => {
+      readByQuery.mockResolvedValueOnce([]) // no settings configured for this collection
+
+      await invokeManifest({ params: { collection: 'unconfigured', file_id: 'item-1' }, schema: {}, accountability: {} })
+
+      expect(res.statusCode).toBe(404)
+      expect(res.body).toEqual({ error: 'No IIIF_settings configured for collection "unconfigured"' })
+      expect(readOne).not.toHaveBeenCalled() // never reaches the collection lookup
+    })
+
+    it('responds 404 (not hang) when the requested item does not exist', async () => {
+      readByQuery.mockResolvedValueOnce([settingsRow()])
+      readOne.mockResolvedValueOnce(undefined) // deleted/nonexistent item
+
+      await invokeManifest({ params: { collection: 'books', file_id: 'gone' }, schema: {}, accountability: {} })
+
+      expect(res.statusCode).toBe(404)
+      expect(res.body).toEqual({ error: 'Item gone not found in collection "books"' })
+    })
+
+    it('forwards a thrown error to next() instead of leaving the request unanswered', async () => {
+      readByQuery.mockResolvedValueOnce([settingsRow()])
+      const boom = new Error('permission denied')
+      readOne.mockRejectedValueOnce(boom)
+
+      await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
+
+      expect(next).toHaveBeenCalledWith(boom)
+      expect(res.body).toBeUndefined()
+    })
+  })
+
   // ─── POST /parse-ocr ────────────────────────────────────────────────────
 
   describe('POST /parse-ocr', () => {

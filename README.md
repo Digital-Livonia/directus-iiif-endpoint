@@ -95,6 +95,8 @@ When adding new functionality, cover each relevant pyramid layer:
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
+### 1.0.13
+- Fixed `GET /manifest/:collection/:file_id` hanging forever (never responding, until the client's own timeout) instead of returning 404 for a nonexistent/deleted item, or a collection with no matching `IIIF_settings` row. Root cause: the whole async handler had no `try`/`catch`, and the code destructured/indexed straight into the (possibly `undefined`) results of `readByQuery`/`readOne` — a nonexistent item made this throw synchronously inside the async function with nothing to catch it, so Express never got a response to send. Found on production after deleting a test record and re-requesting its manifest.
 ### 1.0.12
 - Fixed a Mirador crash (`Cannot read properties of undefined (reading 'targetId')`) introduced by 1.0.11: `GET /iiif/annotation-page/:fileId` rewrote `on`/`within`/`target`/`partOf.id` but missed the nested content object's own id (`resource["@id"]` in v2, `body.id` in v3) — Mirador falls back to that nested id as the annotation's identity (e.g. tracking the currently-selected annotation in the sidebar) when the outer annotation has none of its own. `rewriteAnnotationPageOrigin` now rewrites that too.
 ### 1.0.11
