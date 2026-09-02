@@ -1,0 +1,97 @@
+name: Deploy
+
+# Manual trigger. Both dev and prod Directus load extensions from the `tu` S3
+# storage (bucket dl-tlu-ee); dev uses the `extensions-dev/` prefix, prod uses
+# `extensions/`, so a build can be verified on dev before it goes to prod.
+#
+# (This repo previously kept deployment fully manual on purpose — that changed
+# when the whole extension fleet moved to one deploy pattern.)
+#
+# Required repo (or org) secrets:
+#   S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY  - the tu-s3-credentials k8s secret
+#   KUBERNETES_SA_TOKEN  - the dl-tlu-ee `github-actions` SA token (same value as
+#                          dl-app's KUBERNETES_GITHUB_ACTIONS_SA_TOKEN); only
+#                          needs deployments patch (rollout restart).
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        required: true
+        options: [dev, prod]
+
+env:
+  EXT_NAME: directus-iiif-endpoint
+  KUBE_SERVER: https://kubernetes.hpc.ut.ee:6443
+  KUBE_NAMESPACE: dl-tlu-ee
+  S3_ENDPOINT: https://s3.hpc.ut.ee
+  S3_BUCKET: dl-tlu-ee
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      S3_PREFIX: ${{ inputs.environment == 'prod' && 'extensions' || 'extensions-dev' }}
+      DEPLOYMENT: ${{ inputs.environment == 'prod' && 'dl-directus-deployment' || 'dev-dl-directus-deployment' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run package  # → dist/{build/, package.json, README.md}
+
+      - name: Strip AppleDouble junk
+        run: find dist -name '._*' -delete
+
+      - name: Sync to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          AWS_EC2_METADATA_DISABLED: 'true'
+        run: |
+          set -euo pipefail
+          aws --endpoint-url "$S3_ENDPOINT" s3 sync dist/ \
+            "s3://$S3_BUCKET/$S3_PREFIX/$EXT_NAME/" --delete
+          echo "synced to s3://$S3_BUCKET/$S3_PREFIX/$EXT_NAME/"
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Restart Directus
+        run: |
+          mkdir -p ~/.kube
+          cat > ~/.kube/config <<EOF
+          apiVersion: v1
+          kind: Config
+          clusters:
+          - cluster: { server: ${{ env.KUBE_SERVER }}, insecure-skip-tls-verify: true }
+            name: c
+          contexts:
+          - context: { cluster: c, namespace: ${{ env.KUBE_NAMESPACE }}, user: u }
+            name: ctx
+          current-context: ctx
+          users:
+          - name: u
+            user: { token: ${{ secrets.KUBERNETES_SA_TOKEN }} }
+          EOF
+          kubectl -n "$KUBE_NAMESPACE" rollout restart "deployment/$DEPLOYMENT"
+          kubectl -n "$KUBE_NAMESPACE" rollout status  "deployment/$DEPLOYMENT" --timeout=180s
+
+      - name: Check the extension loaded
+        run: |
+          set -euo pipefail
+          LABEL=$([ "${{ inputs.environment }}" = "prod" ] && echo "app=dl-directus" || echo "app=dev-dl-directus")
+          POD=$(kubectl -n "$KUBE_NAMESPACE" get pods -l "$LABEL" -o jsonpath='{.items[0].metadata.name}')
+          sleep 10
+          kubectl -n "$KUBE_NAMESPACE" logs "$POD" --tail=40 | grep -iE "extension|iiif|error" || true
