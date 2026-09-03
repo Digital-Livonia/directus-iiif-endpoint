@@ -34,36 +34,29 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
 > **Fixed in 1.0.11: annotation highlight boxes now render on dev, not just production.** Previously, clicking an annotation in Mirador showed the highlight box on production but not dev, for the same item — root cause: `annotation_files` JSON is produced by an upstream ALTO→annotation conversion step (outside this repo) that bakes in **absolute URLs pointing at whichever domain was current at conversion time** (typically production's, `db.dl.tlu.ee`). Since dev and production share the same file storage, dev served the *exact same file*, whose `on`/`within.@id` didn't match dev's own canvas origin (`dev.db.dl.tlu.ee`) — Mirador silently failed to draw the box (no console error). Fixed the same way `/parse-ocr` already handles this for `ocr_entries`: canvas `annotations[]` now points at this extension's own `GET /iiif/annotation-page/:fileId` (see URL structure above), which fetches the raw asset and rewrites its `on`/`within`/`target`/`partOf.id` to the current `PUBLIC_URL` before serving it — so the upstream conversion step never needs to be environment-aware.
 
 ## Updating
-- CI (`.github/workflows/ci.yml`) runs lint + tests on every push/PR to `master` — deployment itself stays manual, on purpose (no S3/kubeconfig credentials are stored in this repo)
-- Directus runs on two instances, both in the `dl-tlu-ee` namespace; both need the same `dist/` folder, just delivered differently. In both cases, start with:
-  ```bash
-  npm run package
-  ```
-  (this runs `npm run build` internally and assembles `dist/` — no need to run `build` separately first)
 
-### Production — `dl-directus-deployment`
-- upload the contents of `dist/` to S3 storage via https://console.s3.hpc.ut.ee/ into the folder `extensions`
-- delete the previous version of the folder there first
-- restart: `kubectl rollout restart deployment/dl-directus-deployment -n dl-tlu-ee`
+Deployment is branch-driven CI (`.github/workflows/deploy.yml`), the same model
+as `dl-app` and `directus-extension-search-index`:
 
-### Dev — `dev-dl-directus-deployment`
-Dev Directus runs on the same cluster, so `dist/` is copied straight into the pod's `/directus/extensions/` instead of going through S3. On a T7/macOS checkout, strip the AppleDouble `._*` files `npm run package` may leave in `dist/` first, or they'll get copied into the pod too:
-```bash
-find dist -name '._*' -delete
+| push to… | deploys to | S3 prefix | deployment |
+|---|---|---|---|
+| `development` | **DEV** | `extensions-dev/` | `dev-dl-directus-deployment` |
+| `master` | **PROD** | `extensions/` | `dl-directus-deployment` |
 
-POD=$(kubectl get pods -n dl-tlu-ee -l app=dev-dl-directus -o jsonpath='{.items[0].metadata.name}')
-kubectl exec -n dl-tlu-ee "$POD" -- rm -rf /directus/extensions/directus-iiif-endpoint
-kubectl cp dist "$POD":/directus/extensions/directus-iiif-endpoint -n dl-tlu-ee
-kubectl rollout restart deployment/dev-dl-directus-deployment -n dl-tlu-ee
-kubectl rollout status deployment/dev-dl-directus-deployment -n dl-tlu-ee --timeout=90s
-```
-(pod label is `app=dev-dl-directus` — the deployment is `dev-dl-directus-deployment`, but its pod template uses the shorter label; confirmed against the live cluster 2026-08-25)
+Work on `development`; merge `development` → `master` to promote to prod. The
+`Deploy` job lints, tests, `npm run package`s, `aws s3 sync`s `dist/` to
+`s3://dl-tlu-ee/<prefix>/directus-iiif-endpoint/`, then rollout-restarts the
+matching Directus deployment. `workflow_dispatch` with a `dev`/`prod` choice is
+still available for a manual redeploy.
 
-After the rollout finishes, check the **new** pod (name changes on restart) picked up the build cleanly — a stale `directus:extension.host` here vs. the actual running Directus version can make the extension fail to register silently:
-```bash
-NEW_POD=$(kubectl get pods -n dl-tlu-ee -l app=dev-dl-directus -o jsonpath='{.items[0].metadata.name}')
-kubectl logs -n dl-tlu-ee "$NEW_POD" --tail=30 | grep -i "extension\|error"
-```
+Both dev and prod Directus load extensions from the `tu` S3 storage — the old
+"dev = `kubectl cp` into the pod's PVC" path is gone.
+
+**Secrets** (repo or org): `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` (the
+`tu-s3-credentials` k8s secret) and `KUBERNETES_SA_TOKEN` (the `dl-tlu-ee`
+`github-actions` SA token — deployments patch only).
+
+`ci.yml` still runs lint + tests on every push/PR.
 ## Testing
 
 ```bash
