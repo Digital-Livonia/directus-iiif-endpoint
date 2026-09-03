@@ -88,10 +88,12 @@ jobs:
           kubectl -n "$KUBE_NAMESPACE" rollout restart "deployment/$DEPLOYMENT"
           kubectl -n "$KUBE_NAMESPACE" rollout status  "deployment/$DEPLOYMENT" --timeout=180s
 
-      - name: Check the extension loaded
+      # Best-effort log peek. The github-actions SA can rollout-restart but
+      # can't list pods, so this must not fail the deploy — `rollout status`
+      # above already confirmed the new pod came up healthy.
+      - name: Check the extension loaded (best effort)
+        continue-on-error: true
         run: |
-          set -euo pipefail
           LABEL=$([ "${{ inputs.environment }}" = "prod" ] && echo "app=dl-directus" || echo "app=dev-dl-directus")
-          POD=$(kubectl -n "$KUBE_NAMESPACE" get pods -l "$LABEL" -o jsonpath='{.items[0].metadata.name}')
-          sleep 10
-          kubectl -n "$KUBE_NAMESPACE" logs "$POD" --tail=40 | grep -iE "extension|iiif|error" || true
+          POD=$(kubectl -n "$KUBE_NAMESPACE" get pods -l "$LABEL" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          [ -n "$POD" ] && kubectl -n "$KUBE_NAMESPACE" logs "$POD" --tail=40 | grep -iE "extension|iiif|error" || echo "(pod log not accessible — see rollout status above)"
