@@ -1,11 +1,10 @@
 name: Deploy
 
-# Manual trigger. Both dev and prod Directus load extensions from the `tu` S3
-# storage (bucket dl-tlu-ee); dev uses the `extensions-dev/` prefix, prod uses
-# `extensions/`, so a build can be verified on dev before it goes to prod.
-#
-# (This repo previously kept deployment fully manual on purpose — that changed
-# when the whole extension fleet moved to one deploy pattern.)
+# Branch-driven deploy:
+#   push to `development` -> DEV   (S3 prefix extensions-dev/, dev-dl-directus-deployment)
+#   push to `master`      -> PROD  (S3 prefix extensions/,     dl-directus-deployment)
+# Both environments load extensions from the `tu` S3 storage (bucket dl-tlu-ee).
+# `workflow_dispatch` stays available to redeploy either environment by hand.
 #
 # Required repo (or org) secrets:
 #   S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY  - the tu-s3-credentials k8s secret
@@ -14,6 +13,13 @@ name: Deploy
 #                          needs deployments patch (rollout restart).
 
 on:
+  push:
+    branches: [master, development]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
     inputs:
       environment:
@@ -32,10 +38,10 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    # push to master -> prod; push to development, or a manual run, -> the chosen env
+    environment: ${{ github.event.inputs.environment || (github.ref_name == 'master' && 'prod' || 'dev') }}
     env:
-      S3_PREFIX: ${{ inputs.environment == 'prod' && 'extensions' || 'extensions-dev' }}
-      DEPLOYMENT: ${{ inputs.environment == 'prod' && 'dl-directus-deployment' || 'dev-dl-directus-deployment' }}
+      TARGET: ${{ github.event.inputs.environment || (github.ref_name == 'master' && 'prod' || 'dev') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +54,19 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run package  # → dist/{build/, package.json, README.md}
+
+      - name: Resolve target
+        run: |
+          if [ "$TARGET" = "prod" ]; then
+            echo "S3_PREFIX=extensions"                >> "$GITHUB_ENV"
+            echo "DEPLOYMENT=dl-directus-deployment"    >> "$GITHUB_ENV"
+            echo "POD_LABEL=app=dl-directus"            >> "$GITHUB_ENV"
+          else
+            echo "S3_PREFIX=extensions-dev"             >> "$GITHUB_ENV"
+            echo "DEPLOYMENT=dev-dl-directus-deployment" >> "$GITHUB_ENV"
+            echo "POD_LABEL=app=dev-dl-directus"        >> "$GITHUB_ENV"
+          fi
+          echo "Deploying $EXT_NAME to $TARGET"
 
       - name: Strip AppleDouble junk
         run: find dist -name '._*' -delete
@@ -94,6 +113,5 @@ jobs:
       - name: Check the extension loaded (best effort)
         continue-on-error: true
         run: |
-          LABEL=$([ "${{ inputs.environment }}" = "prod" ] && echo "app=dl-directus" || echo "app=dev-dl-directus")
-          POD=$(kubectl -n "$KUBE_NAMESPACE" get pods -l "$LABEL" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          POD=$(kubectl -n "$KUBE_NAMESPACE" get pods -l "$POD_LABEL" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
           [ -n "$POD" ] && kubectl -n "$KUBE_NAMESPACE" logs "$POD" --tail=40 | grep -iE "extension|iiif|error" || echo "(pod log not accessible — see rollout status above)"
