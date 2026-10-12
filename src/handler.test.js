@@ -219,6 +219,105 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     expect(res.body.service).toBeUndefined()
   })
 
+  describe('empty annotation files (issue #10)', () => {
+    const manifestReq = () => ({
+      params: { collection: 'books', file_id: 'item-1' },
+      schema: {},
+      accountability: {},
+      protocol: 'https',
+      get: (header) => (header === 'host' ? 'test.local' : undefined)
+    })
+
+    // two pages, each with its own annotation file
+    const mockTwoPages = (anno1, anno2) => {
+      readByQuery.mockResolvedValueOnce([settingsRow()])
+      readOne
+        .mockResolvedValueOnce({
+          images: [{ directus_files_id: 'file-1' }, { directus_files_id: 'file-2' }],
+          annotations: [{ directus_files_id: 'anno-1' }, { directus_files_id: 'anno-2' }],
+          title: 'Raamat 1',
+          author_field: 'Tammsaare'
+        })
+        .mockResolvedValueOnce(fileRow({ id: 'file-1', title: 'Page 1', filename_download: 'page1.jpg' }))
+        .mockResolvedValueOnce(fileRow({ id: 'file-2', title: 'Page 2', filename_download: 'page2.jpg' }))
+        .mockResolvedValueOnce({ id: 'anno-1', title: 'page1', filename_download: 'page1.json', ...anno1 })
+        .mockResolvedValueOnce({ id: 'anno-2', title: 'page2', filename_download: 'page2.json', ...anno2 })
+    }
+
+    const emptyList = { '@type': 'sc:AnnotationList', resources: [] }
+    const nonEmptyList = { '@type': 'sc:AnnotationList', resources: [{ on: 'x#xywh=1,2,3,4' }] }
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('omits `annotations` on a canvas whose annotation file is an empty list, keeps it on the others', async () => {
+      mockTwoPages({ filesize: 276 }, { filesize: 55267 })
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => emptyList })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await invokeManifest(manifestReq())
+
+      expect(res.body.items[0].annotations).toBeUndefined()
+      expect(res.body.items[1].annotations).toEqual([
+        { id: `${BASE}/iiif/annotation-page/anno-2`, type: 'AnnotationPage' }
+      ])
+      expect(res.body.service).toBeDefined()
+      // only the small file is checked
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(fetchMock).toHaveBeenCalledWith('https://test.local/assets/anno-1')
+    })
+
+    it('omits the search service when every annotation file is empty', async () => {
+      mockTwoPages({ filesize: 276 }, { filesize: 280 })
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => emptyList }))
+
+      await invokeManifest(manifestReq())
+
+      expect(res.body.items[0].annotations).toBeUndefined()
+      expect(res.body.items[1].annotations).toBeUndefined()
+      expect(res.body.service).toBeUndefined()
+    })
+
+    it('keeps a small annotation file that does contain annotations', async () => {
+      mockTwoPages({ filesize: 900 }, { filesize: 55267 })
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => nonEmptyList }))
+
+      await invokeManifest(manifestReq())
+
+      expect(res.body.items[0].annotations).toHaveLength(1)
+      expect(res.body.items[1].annotations).toHaveLength(1)
+    })
+
+    it('keeps the link when the annotation file cannot be fetched', async () => {
+      mockTwoPages({ filesize: 276 }, { filesize: 55267 })
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403 }))
+
+      await invokeManifest(manifestReq())
+
+      expect(next).not.toHaveBeenCalled()
+      expect(res.body.items[0].annotations).toHaveLength(1)
+    })
+
+    it('keeps the link when fetching throws', async () => {
+      mockTwoPages({ filesize: 276 }, { filesize: 55267 })
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')))
+
+      await invokeManifest(manifestReq())
+
+      expect(next).not.toHaveBeenCalled()
+      expect(res.body.items[0].annotations).toHaveLength(1)
+    })
+
+    it('reads filesize for annotation files', async () => {
+      mockTwoPages({ filesize: 55267 }, { filesize: 55267 })
+
+      await invokeManifest(manifestReq())
+
+      expect(readOne).toHaveBeenCalledWith('anno-1', { fields: ['id', 'title', 'filename_download', 'filesize'] })
+    })
+  })
+
   it('includes seeAlso entries when alto_files/txt_files are configured and filenames match', async () => {
     readByQuery.mockResolvedValueOnce([settingsRow()])
     readOne

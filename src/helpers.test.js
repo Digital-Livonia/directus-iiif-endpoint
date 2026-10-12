@@ -8,7 +8,9 @@ import {
   createIiifCollectionJson,
   extractOcrEntriesFromAnnotationPage,
   buildIiifSearchResponse,
-  rewriteAnnotationPageOrigin
+  rewriteAnnotationPageOrigin,
+  getAnnotationResources,
+  mightBeEmptyAnnotationFile
 } from './helpers.js'
 
 const BASE = 'http://test.local'
@@ -588,6 +590,52 @@ describe('rewriteAnnotationPageOrigin', () => {
     const originalOn = input.resources[0].on
     rewriteAnnotationPageOrigin(input, BASE)
     expect(input.resources[0].on).toBe(originalOn)
+  })
+})
+
+describe('getAnnotationResources', () => {
+  it('reads v2 `resources`', () => {
+    expect(getAnnotationResources({ resources: [{ a: 1 }] })).toEqual([{ a: 1 }])
+  })
+
+  it('reads v3 `items`', () => {
+    expect(getAnnotationResources({ items: [{ a: 1 }, { a: 2 }] })).toHaveLength(2)
+  })
+
+  it('reads a bare `annotations` array', () => {
+    expect(getAnnotationResources({ annotations: [{ a: 1 }] })).toHaveLength(1)
+  })
+
+  it('returns [] for an empty converted list (issue #10)', () => {
+    expect(getAnnotationResources({
+      '@context': 'http://iiif.io/api/presentation/2/context.json',
+      '@type': 'sc:AnnotationList',
+      resources: []
+    })).toEqual([])
+  })
+
+  it('returns [] for missing or shapeless input', () => {
+    expect(getAnnotationResources(null)).toEqual([])
+    expect(getAnnotationResources({})).toEqual([])
+  })
+})
+
+describe('mightBeEmptyAnnotationFile', () => {
+  it('flags small files', () => {
+    expect(mightBeEmptyAnnotationFile({ filesize: 276 })).toBe(true)
+  })
+
+  it('accepts filesize as a string (Directus bigint)', () => {
+    expect(mightBeEmptyAnnotationFile({ filesize: '276' })).toBe(true)
+  })
+
+  it('does not flag files that are too large to be empty', () => {
+    expect(mightBeEmptyAnnotationFile({ filesize: 55267 })).toBe(false)
+  })
+
+  it('does not flag files of unknown size', () => {
+    expect(mightBeEmptyAnnotationFile({})).toBe(false)
+    expect(mightBeEmptyAnnotationFile({ filesize: null })).toBe(false)
   })
 })
 

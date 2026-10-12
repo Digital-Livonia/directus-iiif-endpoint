@@ -243,18 +243,39 @@ export function rewriteAnnotationPageOrigin (annotationPage, directusEndpoint) {
   return rewritten
 }
 
-// Turns one already-fetched W3C/OA annotation list JSON (as stored in the
-// `annotation_files` file assets) into flat rows ready for the `ocr_entries`
-// collection. Pure/testable - no fetch, no Directus service calls here;
-// POST /parse-ocr (index.js) does the fetching and DB writes.
-export function extractOcrEntriesFromAnnotationPage (annotationPage, collectionName, collectionId, directusEndpoint) {
-  const resources = Array.isArray(annotationPage.resources)
+// The annotation array of a stored annotation list, whichever shape it
+// was written in: v2 AnnotationList `resources`, v3 AnnotationPage
+// `items`, or a bare `annotations` array.
+export function getAnnotationResources (annotationPage) {
+  if (!annotationPage) return []
+  return Array.isArray(annotationPage.resources)
     ? annotationPage.resources
     : Array.isArray(annotationPage.items)
       ? annotationPage.items
       : Array.isArray(annotationPage.annotations)
         ? annotationPage.annotations
         : []
+}
+
+// Annotation files below this size are fetched and checked for emptiness
+// before being linked from the manifest; anything larger can't be an empty
+// list. An empty converted list is ~280 bytes, one OCR line ~900 bytes.
+export const EMPTY_ANNOTATION_CHECK_MAX_BYTES = 1024
+
+// Whether a directus_files row (with `filesize`) is small enough that it
+// might be an empty annotation list. Unknown size -> not checked, linked
+// as before.
+export function mightBeEmptyAnnotationFile (file) {
+  const size = Number(file?.filesize)
+  return Number.isFinite(size) && size > 0 && size < EMPTY_ANNOTATION_CHECK_MAX_BYTES
+}
+
+// Turns one already-fetched W3C/OA annotation list JSON (as stored in the
+// `annotation_files` file assets) into flat rows ready for the `ocr_entries`
+// collection. Pure/testable - no fetch, no Directus service calls here;
+// POST /parse-ocr (index.js) does the fetching and DB writes.
+export function extractOcrEntriesFromAnnotationPage (annotationPage, collectionName, collectionId, directusEndpoint) {
+  const resources = getAnnotationResources(annotationPage)
 
   const entries = []
   for (const resource of resources) {

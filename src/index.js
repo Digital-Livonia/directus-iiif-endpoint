@@ -7,7 +7,9 @@ import {
   createIiifCollectionJson,
   extractOcrEntriesFromAnnotationPage,
   buildIiifSearchResponse,
-  rewriteAnnotationPageOrigin
+  rewriteAnnotationPageOrigin,
+  getAnnotationResources,
+  mightBeEmptyAnnotationFile
 } from './helpers.js'
 
 const directusEndpoint = process.env.PUBLIC_URL
@@ -194,7 +196,7 @@ export default {
                 const annotationData = await itemServiceFiles.readOne(
                   item.directus_files_id,
                   {
-                    fields: ['id', 'title', 'filename_download']
+                    fields: ['id', 'title', 'filename_download', 'filesize']
                   }
                 )
                 annotationDataArray.push(annotationData)
@@ -203,6 +205,29 @@ export default {
             annotation_sorted = annotationDataArray.sort((a, b) =>
               a.title > b.title ? 1 : -1
             )
+            // A page whose converted annotation list came out empty still
+            // has a file, and linking it makes Mirador open its annotation
+            // panel on a page with nothing in it (issue #10). Drop those
+            // so the canvas gets no `annotations` and, if every page is
+            // empty, the manifest gets no search service either.
+            const suspects = annotation_sorted.filter(mightBeEmptyAnnotationFile)
+            if (suspects.length > 0) {
+              const requestOrigin = `${req.protocol}://${req.get('host')}`
+              const emptyIds = new Set()
+              await Promise.all(
+                suspects.map(async (file) => {
+                  try {
+                    const response = await fetch(`${requestOrigin}/assets/${file.id}`)
+                    if (!response.ok) return
+                    const annotationPage = await response.json()
+                    if (getAnnotationResources(annotationPage).length === 0) emptyIds.add(file.id)
+                  } catch (error) {
+                    // unreadable -> keep the link, same as before this check
+                  }
+                })
+              )
+              annotation_sorted = annotation_sorted.filter((file) => !emptyIds.has(file.id))
+            }
           }
 
           let txt_files_sorted = []
