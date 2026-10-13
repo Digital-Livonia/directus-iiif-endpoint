@@ -159,6 +159,24 @@ export function resolveMetaValue (data, path) {
   return { localized: true, values }
 }
 
+// The `meta` / `iiif_meta` setting as a list of entries, whatever type the
+// Directus field was given: a JSON array, a JSON string, a comma/newline
+// separated string (text/CSV field), or a single object.
+export function toMetaList (value) {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object') return [value]
+  if (typeof value !== 'string' || !value.trim()) return []
+  const text = value.trim()
+  if (text.startsWith('[') || text.startsWith('{')) {
+    try {
+      return toMetaList(JSON.parse(text))
+    } catch {
+      // not JSON after all -> treat as a delimited list below
+    }
+  }
+  return text.split(/[,\n;]/).map((v) => v.trim()).filter(Boolean)
+}
+
 // One iiif_meta entry, in any of the shapes the setting has had:
 //   "datum_display"                         field picker / list of names
 //   { field: "datum_display" }              repeater with a single subfield

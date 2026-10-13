@@ -13,6 +13,7 @@ import {
   resolveMetaValue,
   metaFieldsFor,
   normalizeMetaEntry,
+  toMetaList,
   buildFieldLabel
 } from './helpers.js'
 
@@ -141,9 +142,8 @@ export default {
           // been moved over.
           // Directus field keys are case-sensitive and the original repeater used
           // capitalised subfield names, so `Meta` is accepted too.
-          const newMeta = [meta, Meta].find((v) => Array.isArray(v) && v.length > 0)
-          const metaSetting = newMeta || iiif_meta
-          const metaEntries = (Array.isArray(metaSetting) ? metaSetting : [])
+          const newMeta = [meta, Meta].map(toMetaList).find((v) => v.length > 0)
+          const metaEntries = (newMeta || toMetaList(iiif_meta))
             .map(normalizeMetaEntry)
             .filter(Boolean)
           metaEntries.forEach((entry) => collectionDataFields.push(...metaFieldsFor(entry.field)))

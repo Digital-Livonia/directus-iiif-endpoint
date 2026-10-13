@@ -14,6 +14,7 @@ import {
   resolveMetaValue,
   metaFieldsFor,
   normalizeMetaEntry,
+  toMetaList,
   buildFieldLabel
 } from './helpers.js'
 
@@ -769,5 +770,26 @@ describe('buildFieldLabel', () => {
     const one = { meta: { translations: [{ language: 'et-EE', translation: 'Kuupäev' }] } }
     expect(buildFieldLabel(one, 'datum').values).toEqual({ et: 'Kuupäev', en: 'Kuupäev' })
     expect(buildFieldLabel(undefined, 'datum').values).toEqual({ et: 'datum', en: 'datum' })
+  })
+})
+
+describe('toMetaList', () => {
+  it('passes arrays through', () => {
+    expect(toMetaList(['a', 'b'])).toEqual(['a', 'b'])
+  })
+
+  it('splits a delimited string', () => {
+    expect(toMetaList('datum_display, datum_date_end\nx')).toEqual(['datum_display', 'datum_date_end', 'x'])
+  })
+
+  it('parses a JSON string', () => {
+    expect(toMetaList('["a","b"]')).toEqual(['a', 'b'])
+    expect(toMetaList('{"field":"a"}')).toEqual([{ field: 'a' }])
+  })
+
+  it('wraps a single object and returns [] for empty values', () => {
+    expect(toMetaList({ field: 'a' })).toEqual([{ field: 'a' }])
+    expect(toMetaList(null)).toEqual([])
+    expect(toMetaList('  ')).toEqual([])
   })
 })
