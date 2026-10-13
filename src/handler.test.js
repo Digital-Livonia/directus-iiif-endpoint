@@ -88,7 +88,7 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
 
     expect(res.body.type).toBe('Manifest')
     expect(res.body.id).toBe(`${BASE}/iiif/manifest/books/item-1`)
-    expect(res.body.label).toEqual({ et: ['Raamat 1'] })
+    expect(res.body.label).toEqual({ et: ['Raamat 1'], en: ['Raamat 1'] })
     expect(res.body.items).toHaveLength(1)
   })
 
@@ -138,9 +138,36 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
 
     expect(res.body.metadata).toEqual([
-      { label: { et: ['Autor'] }, value: { et: ['Tammsaare'] } },
-      { label: { et: ['Aasta'] }, value: { et: ['1934'] } }
+      { label: { et: ['Autor'], en: ['Autor'] }, value: { et: ['Tammsaare'], en: ['Tammsaare'] } },
+      { label: { et: ['Aasta'], en: ['Aasta'] }, value: { et: ['1934'], en: ['1934'] } }
     ])
+  })
+
+  it('reads translatable meta per locale from a translations relation', async () => {
+    readByQuery.mockResolvedValueOnce([
+      settingsRow({
+        iiif_meta: [{ Key: 'Pealkiri', Value: 'translations.title' }]
+      })
+    ])
+    readOne
+      .mockResolvedValueOnce({
+        images: [{ directus_files_id: 'file-1' }],
+        title: 'Raamat 1',
+        translations: [
+          { languages_code: 'et-EE', title: 'Tere' },
+          { languages_code: 'en-US', title: 'Hello' }
+        ]
+      })
+      .mockResolvedValueOnce(fileRow())
+
+    await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
+
+    expect(res.body.metadata).toEqual([
+      { label: { et: ['Pealkiri'], en: ['Pealkiri'] }, value: { et: ['Tere'], en: ['Hello'] } }
+    ])
+    const fields = readOne.mock.calls[0][1].fields
+    expect(fields).toContain('translations.title')
+    expect(fields).toContain('translations.languages_code')
   })
 
   it('omits a metadata row entirely when its underlying field value is null', async () => {
@@ -164,7 +191,7 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
 
     expect(res.body.metadata).toEqual([
-      { label: { et: ['Autor'] }, value: { et: ['Tammsaare'] } }
+      { label: { et: ['Autor'], en: ['Autor'] }, value: { et: ['Tammsaare'], en: ['Tammsaare'] } }
     ])
   })
 

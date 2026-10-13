@@ -9,7 +9,9 @@ import {
   buildIiifSearchResponse,
   rewriteAnnotationPageOrigin,
   getAnnotationResources,
-  mightBeEmptyAnnotationFile
+  mightBeEmptyAnnotationFile,
+  resolveMetaValue,
+  metaFieldsFor
 } from './helpers.js'
 
 const directusEndpoint = process.env.PUBLIC_URL
@@ -123,14 +125,14 @@ export default {
 
           const collectionDataFields = [
           `${iiif_file}.*`,
-          iiif_canvas_label,
+          ...metaFieldsFor(iiif_canvas_label),
           `${annotation_files}.*`,
           `${alto_files}.*`,
           `${txt_files}.*`
           ]
 
           // let's add fields from the user defined configuration
-          iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`))
+          iiif_meta.forEach((item) => collectionDataFields.push(...metaFieldsFor(item.Value)))
           const collectionData = await itemServiceCollection.readOne(fileId, {
             fields: collectionDataFields,
             limit: -1,
@@ -162,7 +164,7 @@ export default {
           const annotationArray = collectionData[`${annotation_files}`]
           const txtArray = collectionData[`${txt_files}`]
           const altoArray = collectionData[`${alto_files}`]
-          const canvasLabel = collectionData[iiif_canvas_label]
+          const canvasLabel = resolveMetaValue(collectionData, iiif_canvas_label)
           const imageDataArray = []
           const annotationDataArray = []
           const altoDataArray = []
@@ -268,7 +270,7 @@ export default {
 
           const iiifMetaItems = iiif_meta.map((item) => {
             const iiifMetaArray = []
-            iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`])
+            iiifMetaArray.push(`${item.Key}`, resolveMetaValue(collectionData, `${item.Value}`))
             return iiifMetaArray
           })
           const image_sorted = imageDataArray.sort((a, b) =>
