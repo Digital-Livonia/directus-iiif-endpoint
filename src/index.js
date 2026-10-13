@@ -11,7 +11,9 @@ import {
   getAnnotationResources,
   mightBeEmptyAnnotationFile,
   resolveMetaValue,
-  metaFieldsFor
+  metaFieldsFor,
+  normalizeMetaEntry,
+  buildFieldLabel
 } from './helpers.js'
 
 const directusEndpoint = process.env.PUBLIC_URL
@@ -60,7 +62,7 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
 export default {
   id: 'iiif',
   handler: (router, { services, exceptions }) => {
-    const { ItemsService } = services
+    const { ItemsService, FieldsService } = services
     // const { ServiceUnavailableException } = exceptions
 
     router.get('/', (req, res) => res.send('IIIF'))
@@ -132,7 +134,10 @@ export default {
           ]
 
           // let's add fields from the user defined configuration
-          iiif_meta.forEach((item) => collectionDataFields.push(...metaFieldsFor(item.Value)))
+          const metaEntries = (Array.isArray(iiif_meta) ? iiif_meta : [])
+            .map(normalizeMetaEntry)
+            .filter(Boolean)
+          metaEntries.forEach((entry) => collectionDataFields.push(...metaFieldsFor(entry.field)))
           const collectionData = await itemServiceCollection.readOne(fileId, {
             fields: collectionDataFields,
             limit: -1,
@@ -268,10 +273,22 @@ export default {
             )
           }
 
-          const iiifMetaItems = iiif_meta.map((item) => {
-            const iiifMetaArray = []
-            iiifMetaArray.push(`${item.Key}`, resolveMetaValue(collectionData, `${item.Value}`))
-            return iiifMetaArray
+          // Labels are the fields' own translated names. Read without the
+          // request's accountability: it's only the label text, and the
+          // values above still go through the permission-checked service.
+          let fieldDefinitions = []
+          if (FieldsService && metaEntries.some((entry) => !entry.staticLabel)) {
+            try {
+              const fieldsService = new FieldsService({ schema: req.schema })
+              fieldDefinitions = await fieldsService.readAll(collection)
+            } catch (error) {
+              // no translated labels available -> fall back to field names
+            }
+          }
+          const iiifMetaItems = metaEntries.map((entry) => {
+            const label = entry.staticLabel ??
+              buildFieldLabel(fieldDefinitions.find((f) => f.field === entry.field), entry.field)
+            return [label, resolveMetaValue(collectionData, entry.field)]
           })
           const image_sorted = imageDataArray.sort((a, b) =>
             a.title > b.title ? 1 : -1

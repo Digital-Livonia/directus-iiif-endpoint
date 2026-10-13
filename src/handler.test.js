@@ -48,7 +48,7 @@ function makeRes () {
 }
 
 describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
-  let router, res, next, readByQuery, readOne, deleteMany, createMany, ItemsService
+  let router, res, next, readByQuery, readOne, deleteMany, createMany, ItemsService, readAllFields, FieldsService
 
   beforeEach(() => {
     router = makeRouter()
@@ -62,7 +62,12 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
       return { readByQuery, readOne, deleteMany, createMany }
     })
 
-    iiifExtension.handler(router, { services: { ItemsService }, exceptions: {} })
+    readAllFields = vi.fn().mockResolvedValue([])
+    FieldsService = vi.fn().mockImplementation(function () {
+      return { readAll: readAllFields }
+    })
+
+    iiifExtension.handler(router, { services: { ItemsService, FieldsService }, exceptions: {} })
 
     res = makeRes()
     next = vi.fn()
@@ -141,6 +146,40 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
       { label: { et: ['Autor'], en: ['Autor'] }, value: { et: ['Tammsaare'], en: ['Tammsaare'] } },
       { label: { et: ['Aasta'], en: ['Aasta'] }, value: { et: ['1934'], en: ['1934'] } }
     ])
+  })
+
+  it('labels a bare field name with the field\'s own translated name', async () => {
+    readByQuery.mockResolvedValueOnce([
+      settingsRow({ iiif_meta: ['datum_display', { field: 'untranslated' }] })
+    ])
+    readAllFields.mockResolvedValueOnce([
+      {
+        field: 'datum_display',
+        meta: {
+          translations: [
+            { language: 'et-EE', translation: 'Kuupäev' },
+            { language: 'en-US', translation: 'Date' }
+          ]
+        }
+      },
+      { field: 'untranslated', meta: { translations: null } }
+    ])
+    readOne
+      .mockResolvedValueOnce({
+        images: [{ directus_files_id: 'file-1' }],
+        title: 'Raamat 1',
+        datum_display: '1280-12-31',
+        untranslated: 'x'
+      })
+      .mockResolvedValueOnce(fileRow())
+
+    await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
+
+    expect(res.body.metadata).toEqual([
+      { label: { et: ['Kuupäev'], en: ['Date'] }, value: { et: ['1280-12-31'], en: ['1280-12-31'] } },
+      { label: { et: ['untranslated'], en: ['untranslated'] }, value: { et: ['x'], en: ['x'] } }
+    ])
+    expect(readAllFields).toHaveBeenCalledWith('books')
   })
 
   it('reads translatable meta per locale from a translations relation', async () => {

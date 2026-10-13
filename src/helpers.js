@@ -159,6 +159,38 @@ export function resolveMetaValue (data, path) {
   return { localized: true, values }
 }
 
+// One iiif_meta entry, in any of the shapes the setting has had:
+//   "datum_display"                         field picker / list of names
+//   { field: "datum_display" }              repeater with a single subfield
+//   { Key: "Kuupäev", Value: "datum_display" }  original Key/Value repeater
+// Returns { field, staticLabel } - staticLabel is only set for Key/Value rows;
+// otherwise the label is the field's own translated name (see
+// buildFieldLabel).
+export function normalizeMetaEntry (entry) {
+  if (typeof entry === 'string') return { field: entry, staticLabel: null }
+  if (!entry || typeof entry !== 'object') return null
+  if (entry.field) return { field: `${entry.field}`, staticLabel: null }
+  if (entry.Value) return { field: `${entry.Value}`, staticLabel: entry.Key ? `${entry.Key}` : null }
+  return null
+}
+
+// The label of a field as an editor sees it: the per-language names set under
+// Data Model -> field -> Translations (stored as
+// meta.translations = [{ language, translation }]). A locale without its own
+// translation falls back to whichever one exists, then to the field name.
+export function buildFieldLabel (fieldMeta, fieldName) {
+  const translations = Array.isArray(fieldMeta?.meta?.translations)
+    ? fieldMeta.meta.translations
+    : []
+  const fallback = translations.find((t) => isFilled(t?.translation))?.translation ?? fieldName
+  const values = {}
+  for (const [locale, code] of Object.entries(META_LOCALES)) {
+    const own = translations.find((t) => t?.language === code && isFilled(t?.translation))
+    values[locale] = own ? own.translation : fallback
+  }
+  return { localized: true, values }
+}
+
 // The Directus `fields` entries needed to read a configured Value path.
 export function metaFieldsFor (path) {
   const dot = `${path}`.indexOf('.')

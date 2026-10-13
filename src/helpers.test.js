@@ -12,7 +12,9 @@ import {
   getAnnotationResources,
   mightBeEmptyAnnotationFile,
   resolveMetaValue,
-  metaFieldsFor
+  metaFieldsFor,
+  normalizeMetaEntry,
+  buildFieldLabel
 } from './helpers.js'
 
 const BASE = 'http://test.local'
@@ -717,5 +719,40 @@ describe('createIiifCollectionJson — localized values', () => {
       true, false, 'https://example.org'
     )
     expect(m.label).toEqual({ et: ['Raamat'], en: ['Book'] })
+  })
+})
+
+describe('normalizeMetaEntry', () => {
+  it('accepts a bare field name', () => {
+    expect(normalizeMetaEntry('datum_display')).toEqual({ field: 'datum_display', staticLabel: null })
+  })
+
+  it('accepts a single-subfield repeater row', () => {
+    expect(normalizeMetaEntry({ field: 'datum_display' })).toEqual({ field: 'datum_display', staticLabel: null })
+  })
+
+  it('keeps the original Key/Value rows working', () => {
+    expect(normalizeMetaEntry({ Key: 'Kuupäev', Value: 'datum' })).toEqual({ field: 'datum', staticLabel: 'Kuupäev' })
+  })
+
+  it('rejects empty entries', () => {
+    expect(normalizeMetaEntry(null)).toBeNull()
+    expect(normalizeMetaEntry({})).toBeNull()
+  })
+})
+
+describe('buildFieldLabel', () => {
+  it('uses each language\'s own field translation', () => {
+    const f = { meta: { translations: [
+      { language: 'et-EE', translation: 'Kuupäev' },
+      { language: 'en-US', translation: 'Date' }
+    ] } }
+    expect(buildFieldLabel(f, 'datum').values).toEqual({ et: 'Kuupäev', en: 'Date' })
+  })
+
+  it('falls back to the existing translation, then to the field name', () => {
+    const one = { meta: { translations: [{ language: 'et-EE', translation: 'Kuupäev' }] } }
+    expect(buildFieldLabel(one, 'datum').values).toEqual({ et: 'Kuupäev', en: 'Kuupäev' })
+    expect(buildFieldLabel(undefined, 'datum').values).toEqual({ et: 'datum', en: 'datum' })
   })
 })
