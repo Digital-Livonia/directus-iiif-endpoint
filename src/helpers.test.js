@@ -743,10 +743,14 @@ describe('normalizeMetaEntry', () => {
 
 describe('buildFieldLabel', () => {
   it('uses each language\'s own field translation', () => {
-    const f = { meta: { translations: [
-      { language: 'et-EE', translation: 'Kuupäev' },
-      { language: 'en-US', translation: 'Date' }
-    ] } }
+    const f = {
+      meta: {
+        translations: [
+          { language: 'et-EE', translation: 'Kuupäev' },
+          { language: 'en-US', translation: 'Date' }
+        ]
+      }
+    }
     expect(buildFieldLabel(f, 'datum').values).toEqual({ et: 'Kuupäev', en: 'Date' })
   })
 
