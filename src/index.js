@@ -13,6 +13,7 @@ import {
   resolveMetaValue,
   metaFieldsFor,
   normalizeMetaEntry,
+  toMetaList,
   buildFieldLabel
 } from './helpers.js'
 
@@ -134,7 +135,7 @@ export default {
           ]
 
           // let's add fields from the user defined configuration
-          const metaEntries = (Array.isArray(iiif_meta) ? iiif_meta : [])
+          const metaEntries = toMetaList(iiif_meta)
             .map(normalizeMetaEntry)
             .filter(Boolean)
           metaEntries.forEach((entry) => collectionDataFields.push(...metaFieldsFor(entry.field)))
@@ -165,7 +166,11 @@ export default {
           if (!collectionData) {
             return res.status(404).json({ error: `Item ${fileId} not found in collection "${collection}"` })
           }
-          const imageArray = collectionData[iiif_file]
+          // An item doesn't always have images, and a relation the caller may
+          // not read comes back missing rather than as an error. Both give a
+          // manifest with no canvases instead of crashing on `.map` (which
+          // used to surface as an opaque 500).
+          const imageArray = Array.isArray(collectionData[iiif_file]) ? collectionData[iiif_file] : []
           const annotationArray = collectionData[`${annotation_files}`]
           const txtArray = collectionData[`${txt_files}`]
           const altoArray = collectionData[`${alto_files}`]
@@ -277,7 +282,7 @@ export default {
           // request's accountability: it's only the label text, and the
           // values above still go through the permission-checked service.
           let fieldDefinitions = []
-          if (FieldsService && metaEntries.some((entry) => !entry.staticLabel)) {
+          if (FieldsService && metaEntries.length > 0) {
             try {
               const fieldsService = new FieldsService({ schema: req.schema })
               fieldDefinitions = await fieldsService.readAll(collection)
@@ -286,8 +291,12 @@ export default {
             }
           }
           const iiifMetaItems = metaEntries.map((entry) => {
-            const label = entry.staticLabel ??
-              buildFieldLabel(fieldDefinitions.find((f) => f.field === entry.field), entry.field)
+            // a path into a relation (person.people_first_name) has no field
+            // definition of its own -> label it with the relation field's name
+            const definition =
+              fieldDefinitions.find((f) => f.field === entry.field) ||
+              fieldDefinitions.find((f) => f.field === entry.field.split('.')[0])
+            const label = buildFieldLabel(definition, entry.field)
             return [label, resolveMetaValue(collectionData, entry.field)]
           })
           const image_sorted = imageDataArray.sort((a, b) =>

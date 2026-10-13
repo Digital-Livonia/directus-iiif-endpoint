@@ -145,9 +145,14 @@ export function resolveMetaValue (data, path) {
   if (!data || !path) return null
   const dot = `${path}`.indexOf('.')
   if (dot === -1) return data[path]
-  const rows = data[path.slice(0, dot)]
+  const related = data[path.slice(0, dot)]
   const key = path.slice(dot + 1)
-  if (!Array.isArray(rows)) return null
+  // many-to-one: a plain related item, e.g. person.people_first_name
+  if (related && typeof related === 'object' && !Array.isArray(related)) {
+    return isFilled(related[key]) ? related[key] : null
+  }
+  if (!Array.isArray(related)) return null
+  const rows = related
   const codeOf = (r) => r?.languages_code?.code ?? r?.languages_code
   const fallback = rows.find((r) => isFilled(r?.[key]))?.[key]
   if (fallback === undefined) return null
@@ -159,18 +164,40 @@ export function resolveMetaValue (data, path) {
   return { localized: true, values }
 }
 
-// One iiif_meta entry, in any of the shapes the setting has had:
-//   "datum_display"                         field picker / list of names
-//   { field: "datum_display" }              repeater with a single subfield
-//   { Key: "Kuupäev", Value: "datum_display" }  original Key/Value repeater
-// Returns { field, staticLabel } - staticLabel is only set for Key/Value rows;
-// otherwise the label is the field's own translated name (see
-// buildFieldLabel).
+// The `meta` / `iiif_meta` setting as a list of entries, whatever type the
+// Directus field was given: a JSON array, a JSON string, a comma/newline
+// separated string (text/CSV field), or a single object.
+export function toMetaList (value) {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object') return [value]
+  if (typeof value !== 'string' || !value.trim()) return []
+  const text = value.trim()
+  if (text.startsWith('[') || text.startsWith('{')) {
+    try {
+      return toMetaList(JSON.parse(text))
+    } catch {
+      // not JSON after all -> treat as a delimited list below
+    }
+  }
+  return text.split(/[,\n;]/).map((v) => v.trim()).filter(Boolean)
+}
+
+// One iiif_meta entry, in any of the shapes it can have:
+//   "datum_display"                  bare field name
+//   { meta: "datum_display" }        repeater subfield `meta` (or `field`)
+// Returns { field } or null for an empty/unknown entry. The label is always
+// the field's own translated name (see buildFieldLabel); there are no static
+// labels.
 export function normalizeMetaEntry (entry) {
-  if (typeof entry === 'string') return { field: entry, staticLabel: null }
+  if (typeof entry === 'string') {
+    return entry.trim() ? { field: entry.trim() } : null
+  }
   if (!entry || typeof entry !== 'object') return null
-  if (entry.field) return { field: `${entry.field}`, staticLabel: null }
-  if (entry.Value) return { field: `${entry.Value}`, staticLabel: entry.Key ? `${entry.Key}` : null }
+  for (const name of ['meta', 'field', 'Meta', 'Field']) {
+    if (typeof entry[name] === 'string' && entry[name].trim()) {
+      return { field: entry[name].trim() }
+    }
+  }
   return null
 }
 
@@ -191,12 +218,15 @@ export function buildFieldLabel (fieldMeta, fieldName) {
   return { localized: true, values }
 }
 
-// The Directus `fields` entries needed to read a configured Value path.
+// The Directus `fields` entries needed to read a configured field path. For a
+// path into a relation (translations rows or a many-to-one item) the related
+// item's permitted fields are requested with `.*` rather than naming
+// `languages_code`, which only translation collections have and which makes
+// Directus answer 403 for any other relation.
 export function metaFieldsFor (path) {
   const dot = `${path}`.indexOf('.')
   if (dot === -1) return [`${path}`]
-  const relation = path.slice(0, dot)
-  return [path, `${relation}.languages_code`]
+  return [`${path.slice(0, dot)}.*`]
 }
 
 // IIIF language map for one metadata label/value. A scalar is repeated for

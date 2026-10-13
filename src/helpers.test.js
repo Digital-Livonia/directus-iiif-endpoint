@@ -14,6 +14,7 @@ import {
   resolveMetaValue,
   metaFieldsFor,
   normalizeMetaEntry,
+  toMetaList,
   buildFieldLabel
 } from './helpers.js'
 
@@ -680,6 +681,12 @@ describe('resolveMetaValue', () => {
     expect(resolveMetaValue({ translations: blank }, 'translations.title').values.en).toBe('Pealkiri')
   })
 
+  it('reads a field of a many-to-one related item', () => {
+    expect(resolveMetaValue({ person: { people_first_name: 'Jaan' } }, 'person.people_first_name')).toBe('Jaan')
+    expect(resolveMetaValue({ person: { people_first_name: null } }, 'person.people_first_name')).toBeNull()
+    expect(resolveMetaValue({ person: null }, 'person.people_first_name')).toBeNull()
+  })
+
   it('returns null when no translation has a value', () => {
     expect(resolveMetaValue({ translations: [] }, 'translations.title')).toBeNull()
     expect(resolveMetaValue({}, 'translations.title')).toBeNull()
@@ -696,8 +703,9 @@ describe('metaFieldsFor', () => {
     expect(metaFieldsFor('author')).toEqual(['author'])
   })
 
-  it('also requests languages_code for a translations path', () => {
-    expect(metaFieldsFor('translations.title')).toEqual(['translations.title', 'translations.languages_code'])
+  it('requests a relation path via the relation\'s permitted fields, never languages_code', () => {
+    expect(metaFieldsFor('translations.title')).toEqual(['translations.*'])
+    expect(metaFieldsFor('person.people_first_name')).toEqual(['person.*'])
   })
 })
 
@@ -724,20 +732,26 @@ describe('createIiifCollectionJson — localized values', () => {
 
 describe('normalizeMetaEntry', () => {
   it('accepts a bare field name', () => {
-    expect(normalizeMetaEntry('datum_display')).toEqual({ field: 'datum_display', staticLabel: null })
+    expect(normalizeMetaEntry('datum_display')).toEqual({ field: 'datum_display' })
   })
 
-  it('accepts a single-subfield repeater row', () => {
-    expect(normalizeMetaEntry({ field: 'datum_display' })).toEqual({ field: 'datum_display', staticLabel: null })
+  it('reads the `meta` (or `field`) subfield of a repeater row', () => {
+    expect(normalizeMetaEntry({ meta: 'datum_display' })).toEqual({ field: 'datum_display' })
+    expect(normalizeMetaEntry({ field: 'datum_display' })).toEqual({ field: 'datum_display' })
   })
 
-  it('keeps the original Key/Value rows working', () => {
-    expect(normalizeMetaEntry({ Key: 'Kuupäev', Value: 'datum' })).toEqual({ field: 'datum', staticLabel: 'Kuupäev' })
+  it('ignores empty Key/Value subfields beside `meta`', () => {
+    expect(normalizeMetaEntry({ Key: null, Value: null, meta: 'datum_display' })).toEqual({ field: 'datum_display' })
+  })
+
+  it('no longer reads legacy Key/Value rows', () => {
+    expect(normalizeMetaEntry({ Key: 'Kuupäev', Value: 'datum' })).toBeNull()
   })
 
   it('rejects empty entries', () => {
     expect(normalizeMetaEntry(null)).toBeNull()
     expect(normalizeMetaEntry({})).toBeNull()
+    expect(normalizeMetaEntry({ meta: '  ' })).toBeNull()
   })
 })
 
@@ -758,5 +772,26 @@ describe('buildFieldLabel', () => {
     const one = { meta: { translations: [{ language: 'et-EE', translation: 'Kuupäev' }] } }
     expect(buildFieldLabel(one, 'datum').values).toEqual({ et: 'Kuupäev', en: 'Kuupäev' })
     expect(buildFieldLabel(undefined, 'datum').values).toEqual({ et: 'datum', en: 'datum' })
+  })
+})
+
+describe('toMetaList', () => {
+  it('passes arrays through', () => {
+    expect(toMetaList(['a', 'b'])).toEqual(['a', 'b'])
+  })
+
+  it('splits a delimited string', () => {
+    expect(toMetaList('datum_display, datum_date_end\nx')).toEqual(['datum_display', 'datum_date_end', 'x'])
+  })
+
+  it('parses a JSON string', () => {
+    expect(toMetaList('["a","b"]')).toEqual(['a', 'b'])
+    expect(toMetaList('{"field":"a"}')).toEqual([{ field: 'a' }])
+  })
+
+  it('wraps a single object and returns [] for empty values', () => {
+    expect(toMetaList({ field: 'a' })).toEqual([{ field: 'a' }])
+    expect(toMetaList(null)).toEqual([])
+    expect(toMetaList('  ')).toEqual([])
   })
 })
