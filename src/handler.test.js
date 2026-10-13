@@ -182,6 +182,17 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     expect(readAllFields).toHaveBeenCalledWith('books')
   })
 
+  it('answers 403 instead of crashing when the image relation is not readable by the caller', async () => {
+    readByQuery.mockResolvedValueOnce([settingsRow()])
+    readOne.mockResolvedValueOnce({ id: 'item-1', title: 'Raamat 1' })
+
+    await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
+
+    expect(res.statusCode).toBe(403)
+    expect(res.body.error).toMatch(/Cannot read "images"/)
+    expect(next).not.toHaveBeenCalled()
+  })
+
   it('reads translatable meta per locale from a translations relation', async () => {
     readByQuery.mockResolvedValueOnce([
       settingsRow({
