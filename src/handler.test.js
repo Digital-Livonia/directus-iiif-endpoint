@@ -182,6 +182,39 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     expect(readAllFields).toHaveBeenCalledWith('books')
   })
 
+  it('prefers the new `meta` setting and falls back to iiif_meta when it is empty', async () => {
+    readByQuery.mockResolvedValueOnce([
+      settingsRow({
+        meta: ['year_field'],
+        iiif_meta: [{ Key: 'Autor', Value: 'author_field' }]
+      })
+    ])
+    readOne
+      .mockResolvedValueOnce({
+        images: [{ directus_files_id: 'file-1' }],
+        title: 'Raamat 1',
+        author_field: 'Tammsaare',
+        year_field: '1934'
+      })
+      .mockResolvedValueOnce(fileRow())
+    await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
+    expect(res.body.metadata).toHaveLength(1)
+    expect(res.body.metadata[0].value).toEqual({ et: ['1934'], en: ['1934'] })
+
+    readByQuery.mockResolvedValueOnce([
+      settingsRow({ meta: [], iiif_meta: [{ Key: 'Autor', Value: 'author_field' }] })
+    ])
+    readOne
+      .mockResolvedValueOnce({
+        images: [{ directus_files_id: 'file-1' }],
+        title: 'Raamat 1',
+        author_field: 'Tammsaare'
+      })
+      .mockResolvedValueOnce(fileRow())
+    await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
+    expect(res.body.metadata[0].label).toEqual({ et: ['Autor'], en: ['Autor'] })
+  })
+
   it('reads translatable meta per locale from a translations relation', async () => {
     readByQuery.mockResolvedValueOnce([
       settingsRow({

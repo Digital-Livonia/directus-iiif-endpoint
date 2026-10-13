@@ -120,6 +120,7 @@ export default {
             iiif_file,
             iiif_canvas_label,
             iiif_meta,
+            meta,
             annotation_files,
             alto_files,
             txt_files
@@ -134,7 +135,11 @@ export default {
           ]
 
           // let's add fields from the user defined configuration
-          const metaEntries = (Array.isArray(iiif_meta) ? iiif_meta : [])
+          // `meta` is the newer setting (field names only); `iiif_meta`
+          // (Key/Value repeater) stays as the fallback until its rows have
+          // been moved over.
+          const metaSetting = Array.isArray(meta) && meta.length > 0 ? meta : iiif_meta
+          const metaEntries = (Array.isArray(metaSetting) ? metaSetting : [])
             .map(normalizeMetaEntry)
             .filter(Boolean)
           metaEntries.forEach((entry) => collectionDataFields.push(...metaFieldsFor(entry.field)))
