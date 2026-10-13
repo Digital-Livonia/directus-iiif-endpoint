@@ -121,6 +121,7 @@ export default {
             iiif_canvas_label,
             iiif_meta,
             meta,
+            Meta,
             annotation_files,
             alto_files,
             txt_files
@@ -138,7 +139,10 @@ export default {
           // `meta` is the newer setting (field names only); `iiif_meta`
           // (Key/Value repeater) stays as the fallback until its rows have
           // been moved over.
-          const metaSetting = Array.isArray(meta) && meta.length > 0 ? meta : iiif_meta
+          // Directus field keys are case-sensitive and the original repeater used
+          // capitalised subfield names, so `Meta` is accepted too.
+          const newMeta = [meta, Meta].find((v) => Array.isArray(v) && v.length > 0)
+          const metaSetting = newMeta || iiif_meta
           const metaEntries = (Array.isArray(metaSetting) ? metaSetting : [])
             .map(normalizeMetaEntry)
             .filter(Boolean)

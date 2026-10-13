@@ -167,11 +167,17 @@ export function resolveMetaValue (data, path) {
 // otherwise the label is the field's own translated name (see
 // buildFieldLabel).
 export function normalizeMetaEntry (entry) {
-  if (typeof entry === 'string') return { field: entry, staticLabel: null }
+  if (typeof entry === 'string') {
+    return entry.trim() ? { field: entry.trim(), staticLabel: null } : null
+  }
   if (!entry || typeof entry !== 'object') return null
-  if (entry.field) return { field: `${entry.field}`, staticLabel: null }
-  if (entry.Value) return { field: `${entry.Value}`, staticLabel: entry.Key ? `${entry.Key}` : null }
-  return null
+  if ('Value' in entry || 'Key' in entry) {
+    return entry.Value ? { field: `${entry.Value}`, staticLabel: entry.Key ? `${entry.Key}` : null } : null
+  }
+  // a repeater row with a single subfield, whatever that subfield is called
+  // ({ field }, { meta }, { Field }, ...): take its one string value
+  const strings = Object.values(entry).filter((v) => typeof v === 'string' && v.trim())
+  return strings.length === 1 ? { field: strings[0].trim(), staticLabel: null } : null
 }
 
 // The label of a field as an editor sees it: the per-language names set under

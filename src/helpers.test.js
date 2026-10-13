@@ -735,6 +735,17 @@ describe('normalizeMetaEntry', () => {
     expect(normalizeMetaEntry({ Key: 'Kuupäev', Value: 'datum' })).toEqual({ field: 'datum', staticLabel: 'Kuupäev' })
   })
 
+  it('takes the single string of a repeater row, whatever its subfield is called', () => {
+    expect(normalizeMetaEntry({ meta: 'datum_display' })).toEqual({ field: 'datum_display', staticLabel: null })
+    expect(normalizeMetaEntry({ Field: 'datum_display', id: 3 })).toEqual({ field: 'datum_display', staticLabel: null })
+  })
+
+  it('ignores a legacy row whose Key and Value were cleared', () => {
+    expect(normalizeMetaEntry({ Key: '', Value: '' })).toBeNull()
+    expect(normalizeMetaEntry({ Key: null, Value: null })).toBeNull()
+    expect(normalizeMetaEntry({ Key: 'Kuupäev', Value: '' })).toBeNull()
+  })
+
   it('rejects empty entries', () => {
     expect(normalizeMetaEntry(null)).toBeNull()
     expect(normalizeMetaEntry({})).toBeNull()
