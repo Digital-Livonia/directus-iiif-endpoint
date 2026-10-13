@@ -129,6 +129,88 @@ export const createItemArray = (results, annotations, directusEndpoint, imageSer
   })
 }
 
+// Manifest locales -> the language codes Directus stores on translation rows
+// (same mapping dl-app uses, see getDirectusLanguageCode there).
+export const META_LOCALES = { et: 'et-EE', en: 'en-US' }
+
+const isFilled = (v) => v !== null && v !== undefined && `${v}`.trim() !== ''
+
+// A configured iiif_meta `Value` is either a plain field name on the item
+// ("date") or a path into a translations relation ("translations.title").
+// Plain fields come back as-is. Translation paths come back as
+// { localized: true, values: { et, en } }, where a locale with no row of its
+// own falls back to the first row that has a value, so a single translation
+// shows in every language. Returns null when nothing is filled.
+export function resolveMetaValue (data, path) {
+  if (!data || !path) return null
+  const dot = `${path}`.indexOf('.')
+  if (dot === -1) return data[path]
+  const rows = data[path.slice(0, dot)]
+  const key = path.slice(dot + 1)
+  if (!Array.isArray(rows)) return null
+  const codeOf = (r) => r?.languages_code?.code ?? r?.languages_code
+  const fallback = rows.find((r) => isFilled(r?.[key]))?.[key]
+  if (fallback === undefined) return null
+  const values = {}
+  for (const [locale, code] of Object.entries(META_LOCALES)) {
+    const own = rows.find((r) => codeOf(r) === code && isFilled(r?.[key]))
+    values[locale] = own ? own[key] : fallback
+  }
+  return { localized: true, values }
+}
+
+// One iiif_meta entry, in any of the shapes the setting has had:
+//   "datum_display"                         field picker / list of names
+//   { field: "datum_display" }              repeater with a single subfield
+//   { Key: "Kuupäev", Value: "datum_display" }  original Key/Value repeater
+// Returns { field, staticLabel } - staticLabel is only set for Key/Value rows;
+// otherwise the label is the field's own translated name (see
+// buildFieldLabel).
+export function normalizeMetaEntry (entry) {
+  if (typeof entry === 'string') return { field: entry, staticLabel: null }
+  if (!entry || typeof entry !== 'object') return null
+  if (entry.field) return { field: `${entry.field}`, staticLabel: null }
+  if (entry.Value) return { field: `${entry.Value}`, staticLabel: entry.Key ? `${entry.Key}` : null }
+  return null
+}
+
+// The label of a field as an editor sees it: the per-language names set under
+// Data Model -> field -> Translations (stored as
+// meta.translations = [{ language, translation }]). A locale without its own
+// translation falls back to whichever one exists, then to the field name.
+export function buildFieldLabel (fieldMeta, fieldName) {
+  const translations = Array.isArray(fieldMeta?.meta?.translations)
+    ? fieldMeta.meta.translations
+    : []
+  const fallback = translations.find((t) => isFilled(t?.translation))?.translation ?? fieldName
+  const values = {}
+  for (const [locale, code] of Object.entries(META_LOCALES)) {
+    const own = translations.find((t) => t?.language === code && isFilled(t?.translation))
+    values[locale] = own ? own.translation : fallback
+  }
+  return { localized: true, values }
+}
+
+// The Directus `fields` entries needed to read a configured Value path.
+export function metaFieldsFor (path) {
+  const dot = `${path}`.indexOf('.')
+  if (dot === -1) return [`${path}`]
+  const relation = path.slice(0, dot)
+  return [path, `${relation}.languages_code`]
+}
+
+// IIIF language map for one metadata label/value. A scalar is repeated for
+// every locale; a localized value is spread per locale.
+const toLanguageMap = (value) => {
+  const localized = value && value.localized === true
+  return Object.fromEntries(
+    Object.keys(META_LOCALES).map((locale) => [
+      locale,
+      [`${localized ? value.values[locale] : value}`]
+    ])
+  )
+}
+
 export const createIiifCollectionJson = (
   canvasLabel,
   items,
@@ -145,8 +227,8 @@ export const createIiifCollectionJson = (
   const iiifMetaItems = iiifMeta
     .filter((item) => item[1] !== null && item[1] !== undefined)
     .map((item) => ({
-      label: { et: [`${item[0]}`] },
-      value: { et: [`${item[1]}`] }
+      label: toLanguageMap(item[0]),
+      value: toLanguageMap(item[1])
     }))
 
   return {
@@ -154,9 +236,7 @@ export const createIiifCollectionJson = (
     sorted,
     id: `${directusEndpoint}/iiif/manifest/${collection}/${fileId}`,
     type: 'Manifest',
-    label: {
-      et: [`${canvasLabel}`]
-    },
+    label: toLanguageMap(canvasLabel),
     metadata: iiifMetaItems,
     items,
     ...(hasAnnotations
@@ -243,18 +323,39 @@ export function rewriteAnnotationPageOrigin (annotationPage, directusEndpoint) {
   return rewritten
 }
 
-// Turns one already-fetched W3C/OA annotation list JSON (as stored in the
-// `annotation_files` file assets) into flat rows ready for the `ocr_entries`
-// collection. Pure/testable - no fetch, no Directus service calls here;
-// POST /parse-ocr (index.js) does the fetching and DB writes.
-export function extractOcrEntriesFromAnnotationPage (annotationPage, collectionName, collectionId, directusEndpoint) {
-  const resources = Array.isArray(annotationPage.resources)
+// The annotation array of a stored annotation list, whichever shape it
+// was written in: v2 AnnotationList `resources`, v3 AnnotationPage
+// `items`, or a bare `annotations` array.
+export function getAnnotationResources (annotationPage) {
+  if (!annotationPage) return []
+  return Array.isArray(annotationPage.resources)
     ? annotationPage.resources
     : Array.isArray(annotationPage.items)
       ? annotationPage.items
       : Array.isArray(annotationPage.annotations)
         ? annotationPage.annotations
         : []
+}
+
+// Annotation files below this size are fetched and checked for emptiness
+// before being linked from the manifest; anything larger can't be an empty
+// list. An empty converted list is ~280 bytes, one OCR line ~900 bytes.
+export const EMPTY_ANNOTATION_CHECK_MAX_BYTES = 1024
+
+// Whether a directus_files row (with `filesize`) is small enough that it
+// might be an empty annotation list. Unknown size -> not checked, linked
+// as before.
+export function mightBeEmptyAnnotationFile (file) {
+  const size = Number(file?.filesize)
+  return Number.isFinite(size) && size > 0 && size < EMPTY_ANNOTATION_CHECK_MAX_BYTES
+}
+
+// Turns one already-fetched W3C/OA annotation list JSON (as stored in the
+// `annotation_files` file assets) into flat rows ready for the `ocr_entries`
+// collection. Pure/testable - no fetch, no Directus service calls here;
+// POST /parse-ocr (index.js) does the fetching and DB writes.
+export function extractOcrEntriesFromAnnotationPage (annotationPage, collectionName, collectionId, directusEndpoint) {
+  const resources = getAnnotationResources(annotationPage)
 
   const entries = []
   for (const resource of resources) {

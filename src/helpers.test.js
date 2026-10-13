@@ -8,7 +8,13 @@ import {
   createIiifCollectionJson,
   extractOcrEntriesFromAnnotationPage,
   buildIiifSearchResponse,
-  rewriteAnnotationPageOrigin
+  rewriteAnnotationPageOrigin,
+  getAnnotationResources,
+  mightBeEmptyAnnotationFile,
+  resolveMetaValue,
+  metaFieldsFor,
+  normalizeMetaEntry,
+  buildFieldLabel
 } from './helpers.js'
 
 const BASE = 'http://test.local'
@@ -282,14 +288,14 @@ describe('createIiifCollectionJson', () => {
     expect(build().id).toBe(`${BASE}/iiif/manifest/books/item-uuid`)
   })
 
-  it('label uses et locale', () => {
-    expect(build().label).toEqual({ et: ['Raamat 1'] })
+  it('label is repeated for every locale', () => {
+    expect(build().label).toEqual({ et: ['Raamat 1'], en: ['Raamat 1'] })
   })
 
-  it('metadata key-value pairs are mapped to et locale', () => {
+  it('metadata key-value pairs are repeated for every locale', () => {
     expect(build().metadata[0]).toEqual({
-      label: { et: ['Autor'] },
-      value: { et: ['Tammsaare'] }
+      label: { et: ['Autor'], en: ['Autor'] },
+      value: { et: ['Tammsaare'], en: ['Tammsaare'] }
     })
   })
 
@@ -316,7 +322,7 @@ describe('createIiifCollectionJson', () => {
   it('omits metadata rows whose value is null', () => {
     const manifest = build({ iiifMeta: [['Autor', 'Tammsaare'], ['Fond', null]] })
     expect(manifest.metadata).toHaveLength(1)
-    expect(manifest.metadata[0].label).toEqual({ et: ['Autor'] })
+    expect(manifest.metadata[0].label).toEqual({ et: ['Autor'], en: ['Autor'] })
   })
 
   it('omits metadata rows whose value is undefined', () => {
@@ -591,6 +597,166 @@ describe('rewriteAnnotationPageOrigin', () => {
   })
 })
 
+describe('getAnnotationResources', () => {
+  it('reads v2 `resources`', () => {
+    expect(getAnnotationResources({ resources: [{ a: 1 }] })).toEqual([{ a: 1 }])
+  })
+
+  it('reads v3 `items`', () => {
+    expect(getAnnotationResources({ items: [{ a: 1 }, { a: 2 }] })).toHaveLength(2)
+  })
+
+  it('reads a bare `annotations` array', () => {
+    expect(getAnnotationResources({ annotations: [{ a: 1 }] })).toHaveLength(1)
+  })
+
+  it('returns [] for an empty converted list (issue #10)', () => {
+    expect(getAnnotationResources({
+      '@context': 'http://iiif.io/api/presentation/2/context.json',
+      '@type': 'sc:AnnotationList',
+      resources: []
+    })).toEqual([])
+  })
+
+  it('returns [] for missing or shapeless input', () => {
+    expect(getAnnotationResources(null)).toEqual([])
+    expect(getAnnotationResources({})).toEqual([])
+  })
+})
+
+describe('mightBeEmptyAnnotationFile', () => {
+  it('flags small files', () => {
+    expect(mightBeEmptyAnnotationFile({ filesize: 276 })).toBe(true)
+  })
+
+  it('accepts filesize as a string (Directus bigint)', () => {
+    expect(mightBeEmptyAnnotationFile({ filesize: '276' })).toBe(true)
+  })
+
+  it('does not flag files that are too large to be empty', () => {
+    expect(mightBeEmptyAnnotationFile({ filesize: 55267 })).toBe(false)
+  })
+
+  it('does not flag files of unknown size', () => {
+    expect(mightBeEmptyAnnotationFile({})).toBe(false)
+    expect(mightBeEmptyAnnotationFile({ filesize: null })).toBe(false)
+  })
+})
+
 // ─── Layer 2: Integration — note ───────────────────────────────────────────
 // Full handler integration tests (mocked ItemsService) live in src/handler.test.js
 // and require a Directus schema stub. See test plan in README.
+
+describe('resolveMetaValue', () => {
+  const rows = [
+    { languages_code: 'et-EE', title: 'Pealkiri' },
+    { languages_code: 'en-US', title: 'Title' }
+  ]
+
+  it('returns a plain field value unchanged', () => {
+    expect(resolveMetaValue({ author: 'Tammsaare' }, 'author')).toBe('Tammsaare')
+  })
+
+  it('picks each locale from its own translation row', () => {
+    expect(resolveMetaValue({ translations: rows }, 'translations.title')).toEqual({
+      localized: true,
+      values: { et: 'Pealkiri', en: 'Title' }
+    })
+  })
+
+  it('falls back to the available translation when one language is missing', () => {
+    const only = [{ languages_code: 'et-EE', title: 'Pealkiri' }]
+    expect(resolveMetaValue({ translations: only }, 'translations.title').values).toEqual({
+      et: 'Pealkiri',
+      en: 'Pealkiri'
+    })
+  })
+
+  it('treats an empty translation as missing', () => {
+    const blank = [
+      { languages_code: 'et-EE', title: 'Pealkiri' },
+      { languages_code: 'en-US', title: '  ' }
+    ]
+    expect(resolveMetaValue({ translations: blank }, 'translations.title').values.en).toBe('Pealkiri')
+  })
+
+  it('returns null when no translation has a value', () => {
+    expect(resolveMetaValue({ translations: [] }, 'translations.title')).toBeNull()
+    expect(resolveMetaValue({}, 'translations.title')).toBeNull()
+  })
+
+  it('accepts languages_code expanded to an object', () => {
+    const expanded = [{ languages_code: { code: 'en-US' }, title: 'Title' }]
+    expect(resolveMetaValue({ translations: expanded }, 'translations.title').values.en).toBe('Title')
+  })
+})
+
+describe('metaFieldsFor', () => {
+  it('requests a plain field as-is', () => {
+    expect(metaFieldsFor('author')).toEqual(['author'])
+  })
+
+  it('also requests languages_code for a translations path', () => {
+    expect(metaFieldsFor('translations.title')).toEqual(['translations.title', 'translations.languages_code'])
+  })
+})
+
+describe('createIiifCollectionJson — localized values', () => {
+  it('emits per-locale label and value for translated metadata', () => {
+    const m = createIiifCollectionJson(
+      'X', [], 'books', 'id', [['Pealkiri', { localized: true, values: { et: 'Tere', en: 'Hello' } }]],
+      true, false, 'https://example.org'
+    )
+    expect(m.metadata[0]).toEqual({
+      label: { et: ['Pealkiri'], en: ['Pealkiri'] },
+      value: { et: ['Tere'], en: ['Hello'] }
+    })
+  })
+
+  it('emits a per-locale manifest label for a translated canvas label', () => {
+    const m = createIiifCollectionJson(
+      { localized: true, values: { et: 'Raamat', en: 'Book' } }, [], 'books', 'id', [],
+      true, false, 'https://example.org'
+    )
+    expect(m.label).toEqual({ et: ['Raamat'], en: ['Book'] })
+  })
+})
+
+describe('normalizeMetaEntry', () => {
+  it('accepts a bare field name', () => {
+    expect(normalizeMetaEntry('datum_display')).toEqual({ field: 'datum_display', staticLabel: null })
+  })
+
+  it('accepts a single-subfield repeater row', () => {
+    expect(normalizeMetaEntry({ field: 'datum_display' })).toEqual({ field: 'datum_display', staticLabel: null })
+  })
+
+  it('keeps the original Key/Value rows working', () => {
+    expect(normalizeMetaEntry({ Key: 'Kuupäev', Value: 'datum' })).toEqual({ field: 'datum', staticLabel: 'Kuupäev' })
+  })
+
+  it('rejects empty entries', () => {
+    expect(normalizeMetaEntry(null)).toBeNull()
+    expect(normalizeMetaEntry({})).toBeNull()
+  })
+})
+
+describe('buildFieldLabel', () => {
+  it('uses each language\'s own field translation', () => {
+    const f = {
+      meta: {
+        translations: [
+          { language: 'et-EE', translation: 'Kuupäev' },
+          { language: 'en-US', translation: 'Date' }
+        ]
+      }
+    }
+    expect(buildFieldLabel(f, 'datum').values).toEqual({ et: 'Kuupäev', en: 'Date' })
+  })
+
+  it('falls back to the existing translation, then to the field name', () => {
+    const one = { meta: { translations: [{ language: 'et-EE', translation: 'Kuupäev' }] } }
+    expect(buildFieldLabel(one, 'datum').values).toEqual({ et: 'Kuupäev', en: 'Kuupäev' })
+    expect(buildFieldLabel(undefined, 'datum').values).toEqual({ et: 'datum', en: 'datum' })
+  })
+})

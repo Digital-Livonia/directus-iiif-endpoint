@@ -48,7 +48,7 @@ function makeRes () {
 }
 
 describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
-  let router, res, next, readByQuery, readOne, deleteMany, createMany, ItemsService
+  let router, res, next, readByQuery, readOne, deleteMany, createMany, ItemsService, readAllFields, FieldsService
 
   beforeEach(() => {
     router = makeRouter()
@@ -62,7 +62,12 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
       return { readByQuery, readOne, deleteMany, createMany }
     })
 
-    iiifExtension.handler(router, { services: { ItemsService }, exceptions: {} })
+    readAllFields = vi.fn().mockResolvedValue([])
+    FieldsService = vi.fn().mockImplementation(function () {
+      return { readAll: readAllFields }
+    })
+
+    iiifExtension.handler(router, { services: { ItemsService, FieldsService }, exceptions: {} })
 
     res = makeRes()
     next = vi.fn()
@@ -88,7 +93,7 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
 
     expect(res.body.type).toBe('Manifest')
     expect(res.body.id).toBe(`${BASE}/iiif/manifest/books/item-1`)
-    expect(res.body.label).toEqual({ et: ['Raamat 1'] })
+    expect(res.body.label).toEqual({ et: ['Raamat 1'], en: ['Raamat 1'] })
     expect(res.body.items).toHaveLength(1)
   })
 
@@ -138,9 +143,70 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
 
     expect(res.body.metadata).toEqual([
-      { label: { et: ['Autor'] }, value: { et: ['Tammsaare'] } },
-      { label: { et: ['Aasta'] }, value: { et: ['1934'] } }
+      { label: { et: ['Autor'], en: ['Autor'] }, value: { et: ['Tammsaare'], en: ['Tammsaare'] } },
+      { label: { et: ['Aasta'], en: ['Aasta'] }, value: { et: ['1934'], en: ['1934'] } }
     ])
+  })
+
+  it('labels a bare field name with the field\'s own translated name', async () => {
+    readByQuery.mockResolvedValueOnce([
+      settingsRow({ iiif_meta: ['datum_display', { field: 'untranslated' }] })
+    ])
+    readAllFields.mockResolvedValueOnce([
+      {
+        field: 'datum_display',
+        meta: {
+          translations: [
+            { language: 'et-EE', translation: 'Kuupäev' },
+            { language: 'en-US', translation: 'Date' }
+          ]
+        }
+      },
+      { field: 'untranslated', meta: { translations: null } }
+    ])
+    readOne
+      .mockResolvedValueOnce({
+        images: [{ directus_files_id: 'file-1' }],
+        title: 'Raamat 1',
+        datum_display: '1280-12-31',
+        untranslated: 'x'
+      })
+      .mockResolvedValueOnce(fileRow())
+
+    await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
+
+    expect(res.body.metadata).toEqual([
+      { label: { et: ['Kuupäev'], en: ['Date'] }, value: { et: ['1280-12-31'], en: ['1280-12-31'] } },
+      { label: { et: ['untranslated'], en: ['untranslated'] }, value: { et: ['x'], en: ['x'] } }
+    ])
+    expect(readAllFields).toHaveBeenCalledWith('books')
+  })
+
+  it('reads translatable meta per locale from a translations relation', async () => {
+    readByQuery.mockResolvedValueOnce([
+      settingsRow({
+        iiif_meta: [{ Key: 'Pealkiri', Value: 'translations.title' }]
+      })
+    ])
+    readOne
+      .mockResolvedValueOnce({
+        images: [{ directus_files_id: 'file-1' }],
+        title: 'Raamat 1',
+        translations: [
+          { languages_code: 'et-EE', title: 'Tere' },
+          { languages_code: 'en-US', title: 'Hello' }
+        ]
+      })
+      .mockResolvedValueOnce(fileRow())
+
+    await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
+
+    expect(res.body.metadata).toEqual([
+      { label: { et: ['Pealkiri'], en: ['Pealkiri'] }, value: { et: ['Tere'], en: ['Hello'] } }
+    ])
+    const fields = readOne.mock.calls[0][1].fields
+    expect(fields).toContain('translations.title')
+    expect(fields).toContain('translations.languages_code')
   })
 
   it('omits a metadata row entirely when its underlying field value is null', async () => {
@@ -164,7 +230,7 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
 
     expect(res.body.metadata).toEqual([
-      { label: { et: ['Autor'] }, value: { et: ['Tammsaare'] } }
+      { label: { et: ['Autor'], en: ['Autor'] }, value: { et: ['Tammsaare'], en: ['Tammsaare'] } }
     ])
   })
 
@@ -217,6 +283,105 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
 
     expect(res.body.items[0].annotations).toBeUndefined()
     expect(res.body.service).toBeUndefined()
+  })
+
+  describe('empty annotation files (issue #10)', () => {
+    const manifestReq = () => ({
+      params: { collection: 'books', file_id: 'item-1' },
+      schema: {},
+      accountability: {},
+      protocol: 'https',
+      get: (header) => (header === 'host' ? 'test.local' : undefined)
+    })
+
+    // two pages, each with its own annotation file
+    const mockTwoPages = (anno1, anno2) => {
+      readByQuery.mockResolvedValueOnce([settingsRow()])
+      readOne
+        .mockResolvedValueOnce({
+          images: [{ directus_files_id: 'file-1' }, { directus_files_id: 'file-2' }],
+          annotations: [{ directus_files_id: 'anno-1' }, { directus_files_id: 'anno-2' }],
+          title: 'Raamat 1',
+          author_field: 'Tammsaare'
+        })
+        .mockResolvedValueOnce(fileRow({ id: 'file-1', title: 'Page 1', filename_download: 'page1.jpg' }))
+        .mockResolvedValueOnce(fileRow({ id: 'file-2', title: 'Page 2', filename_download: 'page2.jpg' }))
+        .mockResolvedValueOnce({ id: 'anno-1', title: 'page1', filename_download: 'page1.json', ...anno1 })
+        .mockResolvedValueOnce({ id: 'anno-2', title: 'page2', filename_download: 'page2.json', ...anno2 })
+    }
+
+    const emptyList = { '@type': 'sc:AnnotationList', resources: [] }
+    const nonEmptyList = { '@type': 'sc:AnnotationList', resources: [{ on: 'x#xywh=1,2,3,4' }] }
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('omits `annotations` on a canvas whose annotation file is an empty list, keeps it on the others', async () => {
+      mockTwoPages({ filesize: 276 }, { filesize: 55267 })
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => emptyList })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await invokeManifest(manifestReq())
+
+      expect(res.body.items[0].annotations).toBeUndefined()
+      expect(res.body.items[1].annotations).toEqual([
+        { id: `${BASE}/iiif/annotation-page/anno-2`, type: 'AnnotationPage' }
+      ])
+      expect(res.body.service).toBeDefined()
+      // only the small file is checked
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(fetchMock).toHaveBeenCalledWith('https://test.local/assets/anno-1')
+    })
+
+    it('omits the search service when every annotation file is empty', async () => {
+      mockTwoPages({ filesize: 276 }, { filesize: 280 })
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => emptyList }))
+
+      await invokeManifest(manifestReq())
+
+      expect(res.body.items[0].annotations).toBeUndefined()
+      expect(res.body.items[1].annotations).toBeUndefined()
+      expect(res.body.service).toBeUndefined()
+    })
+
+    it('keeps a small annotation file that does contain annotations', async () => {
+      mockTwoPages({ filesize: 900 }, { filesize: 55267 })
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => nonEmptyList }))
+
+      await invokeManifest(manifestReq())
+
+      expect(res.body.items[0].annotations).toHaveLength(1)
+      expect(res.body.items[1].annotations).toHaveLength(1)
+    })
+
+    it('keeps the link when the annotation file cannot be fetched', async () => {
+      mockTwoPages({ filesize: 276 }, { filesize: 55267 })
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403 }))
+
+      await invokeManifest(manifestReq())
+
+      expect(next).not.toHaveBeenCalled()
+      expect(res.body.items[0].annotations).toHaveLength(1)
+    })
+
+    it('keeps the link when fetching throws', async () => {
+      mockTwoPages({ filesize: 276 }, { filesize: 55267 })
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')))
+
+      await invokeManifest(manifestReq())
+
+      expect(next).not.toHaveBeenCalled()
+      expect(res.body.items[0].annotations).toHaveLength(1)
+    })
+
+    it('reads filesize for annotation files', async () => {
+      mockTwoPages({ filesize: 55267 }, { filesize: 55267 })
+
+      await invokeManifest(manifestReq())
+
+      expect(readOne).toHaveBeenCalledWith('anno-1', { fields: ['id', 'title', 'filename_download', 'filesize'] })
+    })
   })
 
   it('includes seeAlso entries when alto_files/txt_files are configured and filenames match', async () => {

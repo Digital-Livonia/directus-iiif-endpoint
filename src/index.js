@@ -7,7 +7,13 @@ import {
   createIiifCollectionJson,
   extractOcrEntriesFromAnnotationPage,
   buildIiifSearchResponse,
-  rewriteAnnotationPageOrigin
+  rewriteAnnotationPageOrigin,
+  getAnnotationResources,
+  mightBeEmptyAnnotationFile,
+  resolveMetaValue,
+  metaFieldsFor,
+  normalizeMetaEntry,
+  buildFieldLabel
 } from './helpers.js'
 
 const directusEndpoint = process.env.PUBLIC_URL
@@ -56,7 +62,7 @@ const createIiifSingleImageJson = (fileId, height, width) => ({
 export default {
   id: 'iiif',
   handler: (router, { services, exceptions }) => {
-    const { ItemsService } = services
+    const { ItemsService, FieldsService } = services
     // const { ServiceUnavailableException } = exceptions
 
     router.get('/', (req, res) => res.send('IIIF'))
@@ -121,14 +127,17 @@ export default {
 
           const collectionDataFields = [
           `${iiif_file}.*`,
-          iiif_canvas_label,
+          ...metaFieldsFor(iiif_canvas_label),
           `${annotation_files}.*`,
           `${alto_files}.*`,
           `${txt_files}.*`
           ]
 
           // let's add fields from the user defined configuration
-          iiif_meta.map((item) => collectionDataFields.push(`${item.Value}`))
+          const metaEntries = (Array.isArray(iiif_meta) ? iiif_meta : [])
+            .map(normalizeMetaEntry)
+            .filter(Boolean)
+          metaEntries.forEach((entry) => collectionDataFields.push(...metaFieldsFor(entry.field)))
           const collectionData = await itemServiceCollection.readOne(fileId, {
             fields: collectionDataFields,
             limit: -1,
@@ -160,7 +169,7 @@ export default {
           const annotationArray = collectionData[`${annotation_files}`]
           const txtArray = collectionData[`${txt_files}`]
           const altoArray = collectionData[`${alto_files}`]
-          const canvasLabel = collectionData[iiif_canvas_label]
+          const canvasLabel = resolveMetaValue(collectionData, iiif_canvas_label)
           const imageDataArray = []
           const annotationDataArray = []
           const altoDataArray = []
@@ -194,7 +203,7 @@ export default {
                 const annotationData = await itemServiceFiles.readOne(
                   item.directus_files_id,
                   {
-                    fields: ['id', 'title', 'filename_download']
+                    fields: ['id', 'title', 'filename_download', 'filesize']
                   }
                 )
                 annotationDataArray.push(annotationData)
@@ -203,6 +212,29 @@ export default {
             annotation_sorted = annotationDataArray.sort((a, b) =>
               a.title > b.title ? 1 : -1
             )
+            // A page whose converted annotation list came out empty still
+            // has a file, and linking it makes Mirador open its annotation
+            // panel on a page with nothing in it (issue #10). Drop those
+            // so the canvas gets no `annotations` and, if every page is
+            // empty, the manifest gets no search service either.
+            const suspects = annotation_sorted.filter(mightBeEmptyAnnotationFile)
+            if (suspects.length > 0) {
+              const requestOrigin = `${req.protocol}://${req.get('host')}`
+              const emptyIds = new Set()
+              await Promise.all(
+                suspects.map(async (file) => {
+                  try {
+                    const response = await fetch(`${requestOrigin}/assets/${file.id}`)
+                    if (!response.ok) return
+                    const annotationPage = await response.json()
+                    if (getAnnotationResources(annotationPage).length === 0) emptyIds.add(file.id)
+                  } catch (error) {
+                    // unreadable -> keep the link, same as before this check
+                  }
+                })
+              )
+              annotation_sorted = annotation_sorted.filter((file) => !emptyIds.has(file.id))
+            }
           }
 
           let txt_files_sorted = []
@@ -241,10 +273,22 @@ export default {
             )
           }
 
-          const iiifMetaItems = iiif_meta.map((item) => {
-            const iiifMetaArray = []
-            iiifMetaArray.push(`${item.Key}`, collectionData[`${item.Value}`])
-            return iiifMetaArray
+          // Labels are the fields' own translated names. Read without the
+          // request's accountability: it's only the label text, and the
+          // values above still go through the permission-checked service.
+          let fieldDefinitions = []
+          if (FieldsService && metaEntries.some((entry) => !entry.staticLabel)) {
+            try {
+              const fieldsService = new FieldsService({ schema: req.schema })
+              fieldDefinitions = await fieldsService.readAll(collection)
+            } catch (error) {
+              // no translated labels available -> fall back to field names
+            }
+          }
+          const iiifMetaItems = metaEntries.map((entry) => {
+            const label = entry.staticLabel ??
+              buildFieldLabel(fieldDefinitions.find((f) => f.field === entry.field), entry.field)
+            return [label, resolveMetaValue(collectionData, entry.field)]
           })
           const image_sorted = imageDataArray.sort((a, b) =>
             a.title > b.title ? 1 : -1
