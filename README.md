@@ -25,11 +25,88 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
   - `iiif_collection` — collection name
   - `iiif_file` — relation field storing images
   - `iiif_canvas_label` — field used as manifest label
-  - `iiif_meta` — array of Key-Value pairs for manifest metadata
+  - `meta` — list of Directus field names shown as manifest metadata (see [Manifest metadata and languages](#manifest-metadata-and-languages))
+  - `iiif_meta` — *legacy*: array of Key-Value pairs for manifest metadata. Still read, but only when `meta` is empty; remove it once all rows use `meta`
   - `annotation_files` — related annotation files (JSON/W3C annotations)
   - `alto_files` — related ALTO XML files
   - `txt_files` — related plain text files
 - `annotation_files`, `alto_files`, and `txt_files` are matched to an image by filename: the image's filename stem (everything before the last `.`) must equal the stem of the related file, e.g. `page001.jpg` ↔ `page001.json` / `page001.xml` / `page001.txt`. Unmatched files are silently skipped for that canvas.
+
+## Manifest metadata and languages
+
+The manifest is published in two languages, `et` and `en`. Every language map
+the extension builds has both keys, e.g.
+
+```json
+"metadata": [
+  {
+    "label": { "et": ["Kuupäev"], "en": ["Date"] },
+    "value": { "et": ["1280-12-31"], "en": ["1280-12-31"] }
+  }
+]
+```
+
+Viewers such as Mirador pick the entry that matches the user's language.
+
+### Where the label and the value come from
+
+Each `meta` entry is the name of a field in the item's collection (for
+example `datum_display`). Nothing else has to be typed in `IIIF_settings`:
+
+| Part | Source |
+|---|---|
+| **label** | The field's own translated name: Directus **Settings → Data Model → *collection* → *field* → Translations**. `et-EE` fills `et`, `en-US` fills `en`. |
+| **value** | The item's value in that field, repeated in both languages. |
+
+So to change a label, edit the field's translations in the Data Model, not the
+IIIF settings. If a field has a name for only one language, that name is used
+for both. If it has none, the field name itself is shown (`datum_display`) —
+that is the sign a translation is missing.
+
+A value can be translated as well, when the item stores it in a translations
+relation: enter the path, e.g. `translations.title`. Each language is then
+taken from that item's translation row (`et-EE` → `et`, `en-US` → `en`). A
+language without a row of its own shows the translation that exists.
+
+The same rules apply to `iiif_canvas_label`, which becomes the manifest's own
+`label`.
+
+Rows are left out of the manifest when the item has no value for them.
+
+### Setting it up
+
+1. In **Data Model**, make sure each field you want to show has its
+   `et-EE` and `en-US` names filled in under *Translations*.
+2. In `IIIF_settings`, open the row for the collection and list those fields
+   in `meta`.
+3. Open `/iiif/manifest/<collection>/<id>` and check the labels, or load it in
+   Mirador and switch language.
+
+### Entry formats and the move from `iiif_meta`
+
+`meta` entries are accepted in these shapes; the extension reads all of them:
+
+| Entry | Meaning |
+|---|---|
+| `"datum_display"` | field name (use this) |
+| `{ "field": "datum_display" }` | same, from a one-subfield repeater |
+| `{ "Key": "Kuupäev", "Value": "datum_display" }` | legacy: `Key` is a fixed label shown in both languages, `Value` the field |
+
+`meta` takes precedence. Migrating a collection is: fill `meta` with the field
+names, check the manifest, and only then clear `iiif_meta`. A settings row
+where `meta` is empty keeps working off `iiif_meta`, so nothing breaks
+mid-migration.
+
+Why a separate `meta` field rather than changing the repeater: a Directus
+repeater cannot hold a translations interface, and the labels no longer need to
+be typed in the settings at all.
+
+### Permissions
+
+Values are read with the requesting user's permissions, as before, so a field
+the public role cannot read is not shown. Labels are read from the field
+definitions without that check, since they are only names.
+
 
 > **Fixed in 1.0.11: annotation highlight boxes now render on dev, not just production.** Previously, clicking an annotation in Mirador showed the highlight box on production but not dev, for the same item — root cause: `annotation_files` JSON is produced by an upstream ALTO→annotation conversion step (outside this repo) that bakes in **absolute URLs pointing at whichever domain was current at conversion time** (typically production's, `db.dl.tlu.ee`). Since dev and production share the same file storage, dev served the *exact same file*, whose `on`/`within.@id` didn't match dev's own canvas origin (`dev.db.dl.tlu.ee`) — Mirador silently failed to draw the box (no console error). Fixed the same way `/parse-ocr` already handles this for `ocr_entries`: canvas `annotations[]` now points at this extension's own `GET /iiif/annotation-page/:fileId` (see URL structure above), which fetches the raw asset and rewrites its `on`/`within`/`target`/`partOf.id` to the current `PUBLIC_URL` before serving it — so the upstream conversion step never needs to be environment-aware.
 
@@ -88,6 +165,8 @@ When adding new functionality, cover each relevant pyramid layer:
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
+### Unreleased
+- Manifest `label` and metadata `label`/`value` are now built for both `et` and `en` instead of a hard-coded `et` (#9). Metadata labels come from the field's own Data Model translations; values can come from a `translations` relation. New `IIIF_settings.meta` field (list of field names); `iiif_meta` remains as a fallback while `meta` is empty. See [Manifest metadata and languages](#manifest-metadata-and-languages).
 ### 1.0.13
 - Fixed `GET /manifest/:collection/:file_id` hanging forever (never responding, until the client's own timeout) instead of returning 404 for a nonexistent/deleted item, or a collection with no matching `IIIF_settings` row. Root cause: the whole async handler had no `try`/`catch`, and the code destructured/indexed straight into the (possibly `undefined`) results of `readByQuery`/`readOne` — a nonexistent item made this throw synchronously inside the async function with nothing to catch it, so Express never got a response to send. Found on production after deleting a test record and re-requesting its manifest.
 ### 1.0.12
