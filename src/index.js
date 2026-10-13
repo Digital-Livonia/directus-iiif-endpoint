@@ -287,7 +287,12 @@ export default {
             }
           }
           const iiifMetaItems = metaEntries.map((entry) => {
-            const label = buildFieldLabel(fieldDefinitions.find((f) => f.field === entry.field), entry.field)
+            // a path into a relation (person.people_first_name) has no field
+            // definition of its own -> label it with the relation field's name
+            const definition =
+              fieldDefinitions.find((f) => f.field === entry.field) ||
+              fieldDefinitions.find((f) => f.field === entry.field.split('.')[0])
+            const label = buildFieldLabel(definition, entry.field)
             return [label, resolveMetaValue(collectionData, entry.field)]
           })
           const image_sorted = imageDataArray.sort((a, b) =>

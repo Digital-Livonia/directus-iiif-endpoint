@@ -205,8 +205,8 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
       { label: { et: ['translations.title'], en: ['translations.title'] }, value: { et: ['Tere'], en: ['Hello'] } }
     ])
     const fields = readOne.mock.calls[0][1].fields
-    expect(fields).toContain('translations.title')
-    expect(fields).toContain('translations.languages_code')
+    expect(fields).toContain('translations.*')
+    expect(fields).not.toContain('translations.languages_code')
   })
 
   it('omits a metadata row entirely when its underlying field value is null', async () => {

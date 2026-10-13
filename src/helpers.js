@@ -145,9 +145,14 @@ export function resolveMetaValue (data, path) {
   if (!data || !path) return null
   const dot = `${path}`.indexOf('.')
   if (dot === -1) return data[path]
-  const rows = data[path.slice(0, dot)]
+  const related = data[path.slice(0, dot)]
   const key = path.slice(dot + 1)
-  if (!Array.isArray(rows)) return null
+  // many-to-one: a plain related item, e.g. person.people_first_name
+  if (related && typeof related === 'object' && !Array.isArray(related)) {
+    return isFilled(related[key]) ? related[key] : null
+  }
+  if (!Array.isArray(related)) return null
+  const rows = related
   const codeOf = (r) => r?.languages_code?.code ?? r?.languages_code
   const fallback = rows.find((r) => isFilled(r?.[key]))?.[key]
   if (fallback === undefined) return null
@@ -213,12 +218,15 @@ export function buildFieldLabel (fieldMeta, fieldName) {
   return { localized: true, values }
 }
 
-// The Directus `fields` entries needed to read a configured Value path.
+// The Directus `fields` entries needed to read a configured field path. For a
+// path into a relation (translations rows or a many-to-one item) the related
+// item's permitted fields are requested with `.*` rather than naming
+// `languages_code`, which only translation collections have and which makes
+// Directus answer 403 for any other relation.
 export function metaFieldsFor (path) {
   const dot = `${path}`.indexOf('.')
   if (dot === -1) return [`${path}`]
-  const relation = path.slice(0, dot)
-  return [path, `${relation}.languages_code`]
+  return [`${path.slice(0, dot)}.*`]
 }
 
 // IIIF language map for one metadata label/value. A scalar is repeated for

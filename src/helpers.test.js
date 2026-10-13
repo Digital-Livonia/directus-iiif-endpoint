@@ -681,6 +681,12 @@ describe('resolveMetaValue', () => {
     expect(resolveMetaValue({ translations: blank }, 'translations.title').values.en).toBe('Pealkiri')
   })
 
+  it('reads a field of a many-to-one related item', () => {
+    expect(resolveMetaValue({ person: { people_first_name: 'Jaan' } }, 'person.people_first_name')).toBe('Jaan')
+    expect(resolveMetaValue({ person: { people_first_name: null } }, 'person.people_first_name')).toBeNull()
+    expect(resolveMetaValue({ person: null }, 'person.people_first_name')).toBeNull()
+  })
+
   it('returns null when no translation has a value', () => {
     expect(resolveMetaValue({ translations: [] }, 'translations.title')).toBeNull()
     expect(resolveMetaValue({}, 'translations.title')).toBeNull()
@@ -697,8 +703,9 @@ describe('metaFieldsFor', () => {
     expect(metaFieldsFor('author')).toEqual(['author'])
   })
 
-  it('also requests languages_code for a translations path', () => {
-    expect(metaFieldsFor('translations.title')).toEqual(['translations.title', 'translations.languages_code'])
+  it('requests a relation path via the relation\'s permitted fields, never languages_code', () => {
+    expect(metaFieldsFor('translations.title')).toEqual(['translations.*'])
+    expect(metaFieldsFor('person.people_first_name')).toEqual(['person.*'])
   })
 })
 

@@ -67,6 +67,10 @@ relation: enter the path, e.g. `translations.title`. Each language is then
 taken from that item's translation row (`et-EE` → `et`, `en-US` → `en`). A
 language without a row of its own shows the translation that exists.
 
+A value can also come from a many-to-one related item, e.g.
+`person.people_first_name`; the label is then the name of the relation field
+(`person`) from the Data Model.
+
 The same rules apply to `iiif_canvas_label`, which becomes the manifest's own
 `label`.
 
