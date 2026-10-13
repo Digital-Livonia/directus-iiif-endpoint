@@ -179,7 +179,7 @@ export function toMetaList (value) {
 
 // One iiif_meta entry, in any of the shapes the setting has had:
 //   "datum_display"                         field picker / list of names
-//   { field: "datum_display" }              repeater with a single subfield
+//   { meta: "datum_display" }              repeater subfield `meta` (or `field`)
 //   { Key: "Kuupäev", Value: "datum_display" }  original Key/Value repeater
 // Returns { field, staticLabel } - staticLabel is only set for Key/Value rows;
 // otherwise the label is the field's own translated name (see
@@ -189,13 +189,15 @@ export function normalizeMetaEntry (entry) {
     return entry.trim() ? { field: entry.trim(), staticLabel: null } : null
   }
   if (!entry || typeof entry !== 'object') return null
-  if ('Value' in entry || 'Key' in entry) {
-    return entry.Value ? { field: `${entry.Value}`, staticLabel: entry.Key ? `${entry.Key}` : null } : null
+  // new-style row: the field name sits in its own subfield, which may sit
+  // beside empty legacy Key/Value subfields in the same repeater
+  for (const name of ['meta', 'field', 'Meta', 'Field']) {
+    if (typeof entry[name] === 'string' && entry[name].trim()) {
+      return { field: entry[name].trim(), staticLabel: null }
+    }
   }
-  // a repeater row with a single subfield, whatever that subfield is called
-  // ({ field }, { meta }, { Field }, ...): take its one string value
-  const strings = Object.values(entry).filter((v) => typeof v === 'string' && v.trim())
-  return strings.length === 1 ? { field: strings[0].trim(), staticLabel: null } : null
+  if (entry.Value) return { field: `${entry.Value}`, staticLabel: entry.Key ? `${entry.Key}` : null }
+  return null
 }
 
 // The label of a field as an editor sees it: the per-language names set under

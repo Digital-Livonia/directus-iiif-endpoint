@@ -25,8 +25,7 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
   - `iiif_collection` — collection name
   - `iiif_file` — relation field storing images
   - `iiif_canvas_label` — field used as manifest label
-  - `meta` — list of Directus field names shown as manifest metadata (see [Manifest metadata and languages](#manifest-metadata-and-languages))
-  - `iiif_meta` — *legacy*: array of Key-Value pairs for manifest metadata. Still read, but only when `meta` is empty; remove it once all rows use `meta`
+  - `iiif_meta` — repeater listing the fields shown as manifest metadata (see [Manifest metadata and languages](#manifest-metadata-and-languages)). New rows use the subfield `meta` (a field name); the older `Key`/`Value` subfields still work and are read when `meta` is empty on that row
   - `annotation_files` — related annotation files (JSON/W3C annotations)
   - `alto_files` — related ALTO XML files
   - `txt_files` — related plain text files
@@ -50,7 +49,7 @@ Viewers such as Mirador pick the entry that matches the user's language.
 
 ### Where the label and the value come from
 
-Each `meta` entry is the name of a field in the item's collection (for
+Each `meta` subfield holds the name of a field in the item's collection (for
 example `datum_display`). Nothing else has to be typed in `IIIF_settings`:
 
 | Part | Source |
@@ -77,28 +76,33 @@ Rows are left out of the manifest when the item has no value for them.
 
 1. In **Data Model**, make sure each field you want to show has its
    `et-EE` and `en-US` names filled in under *Translations*.
-2. In `IIIF_settings`, open the row for the collection and list those fields
-   in `meta`.
+2. In `IIIF_settings`, open the row for the collection and add one
+   `iiif_meta` repeater row per field, filling the **`meta`** subfield with the
+   field name (e.g. `datum_display`). Leave `Key` and `Value` empty.
 3. Open `/iiif/manifest/<collection>/<id>` and check the labels, or load it in
    Mirador and switch language.
 
-### Entry formats and the move from `iiif_meta`
+### Repeater rows and the move from `Key`/`Value`
 
-`meta` entries are accepted in these shapes; the extension reads all of them:
+Each `iiif_meta` row is read like this:
 
-| Entry | Meaning |
+| Row | Meaning |
 |---|---|
-| `"datum_display"` | field name (use this) |
-| `{ "field": "datum_display" }` | same, from a one-subfield repeater |
+| `{ "meta": "datum_display" }` | field name, label from the field's translations (use this) |
+| `{ "Key": null, "Value": null, "meta": "datum_display" }` | same — empty `Key`/`Value` beside `meta` are ignored |
 | `{ "Key": "Kuupäev", "Value": "datum_display" }` | legacy: `Key` is a fixed label shown in both languages, `Value` the field |
 
-`meta` takes precedence. Migrating a collection is: fill `meta` with the field
-names, check the manifest, and only then clear `iiif_meta`. A settings row
-where `meta` is empty keeps working off `iiif_meta`, so nothing breaks
-mid-migration.
+If a row has both, `meta` wins. Rows with neither are skipped, so a collection
+can be migrated row by row: add the `meta` subfield, fill it in, check the
+manifest, then clear (and later remove) `Key` and `Value`. Rows not yet
+migrated keep working.
 
-Why a separate `meta` field rather than changing the repeater: a Directus
-repeater cannot hold a translations interface, and the labels no longer need to
+The extension also accepts a top-level `meta` field on `IIIF_settings` (a list
+or comma separated text of field names); it takes precedence over `iiif_meta`
+when present. This is optional — the repeater subfield is what is in use.
+
+Why a plain field name instead of a translated value in the settings: a Directus
+repeater cannot hold a translations interface, and the label no longer needs to
 be typed in the settings at all.
 
 ### Permissions
@@ -166,7 +170,7 @@ There has been some discussion about the IIIF support for Directus: https://gith
 
 ## Versions
 ### Unreleased
-- Manifest `label` and metadata `label`/`value` are now built for both `et` and `en` instead of a hard-coded `et` (#9). Metadata labels come from the field's own Data Model translations; values can come from a `translations` relation. New `IIIF_settings.meta` field (list of field names); `iiif_meta` remains as a fallback while `meta` is empty. See [Manifest metadata and languages](#manifest-metadata-and-languages).
+- Manifest `label` and metadata `label`/`value` are now built for both `et` and `en` instead of a hard-coded `et` (#9). Metadata labels come from the field's own Data Model translations; values can come from a `translations` relation. `iiif_meta` rows take a new `meta` subfield (field name); `Key`/`Value` rows keep working. See [Manifest metadata and languages](#manifest-metadata-and-languages).
 ### 1.0.13
 - Fixed `GET /manifest/:collection/:file_id` hanging forever (never responding, until the client's own timeout) instead of returning 404 for a nonexistent/deleted item, or a collection with no matching `IIIF_settings` row. Root cause: the whole async handler had no `try`/`catch`, and the code destructured/indexed straight into the (possibly `undefined`) results of `readByQuery`/`readOne` — a nonexistent item made this throw synchronously inside the async function with nothing to catch it, so Express never got a response to send. Found on production after deleting a test record and re-requesting its manifest.
 ### 1.0.12

@@ -736,9 +736,16 @@ describe('normalizeMetaEntry', () => {
     expect(normalizeMetaEntry({ Key: 'Kuupäev', Value: 'datum' })).toEqual({ field: 'datum', staticLabel: 'Kuupäev' })
   })
 
-  it('takes the single string of a repeater row, whatever its subfield is called', () => {
+  it('reads the `meta` subfield of a repeater row, even beside empty Key/Value', () => {
     expect(normalizeMetaEntry({ meta: 'datum_display' })).toEqual({ field: 'datum_display', staticLabel: null })
-    expect(normalizeMetaEntry({ Field: 'datum_display', id: 3 })).toEqual({ field: 'datum_display', staticLabel: null })
+    expect(normalizeMetaEntry({ Key: null, Value: null, meta: 'datum_display' })).toEqual({
+      field: 'datum_display',
+      staticLabel: null
+    })
+  })
+
+  it('prefers `meta` over a legacy Value on the same row', () => {
+    expect(normalizeMetaEntry({ Key: 'Date', Value: 'old', meta: 'datum_display' }).field).toBe('datum_display')
   })
 
   it('ignores a legacy row whose Key and Value were cleared', () => {
