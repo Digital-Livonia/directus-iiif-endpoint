@@ -166,15 +166,11 @@ export default {
           if (!collectionData) {
             return res.status(404).json({ error: `Item ${fileId} not found in collection "${collection}"` })
           }
-          const imageArray = collectionData[iiif_file]
-          // A relation the caller may not read comes back missing, not as an
-          // error. Without this, `imageArray.map` below threw a TypeError that
-          // surfaced as an opaque 500 for e.g. the public role.
-          if (!Array.isArray(imageArray)) {
-            return res.status(403).json({
-              error: `Cannot read "${iiif_file}" (images) of item ${fileId} in "${collection}" - check read permission on that relation and its junction collection for this role`
-            })
-          }
+          // An item doesn't always have images, and a relation the caller may
+          // not read comes back missing rather than as an error. Both give a
+          // manifest with no canvases instead of crashing on `.map` (which
+          // used to surface as an opaque 500).
+          const imageArray = Array.isArray(collectionData[iiif_file]) ? collectionData[iiif_file] : []
           const annotationArray = collectionData[`${annotation_files}`]
           const txtArray = collectionData[`${txt_files}`]
           const altoArray = collectionData[`${alto_files}`]

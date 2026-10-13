@@ -182,14 +182,15 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     expect(readAllFields).toHaveBeenCalledWith('books')
   })
 
-  it('answers 403 instead of crashing when the image relation is not readable by the caller', async () => {
+  it('returns a manifest with no canvases when the item has no images or the relation is unreadable', async () => {
     readByQuery.mockResolvedValueOnce([settingsRow()])
-    readOne.mockResolvedValueOnce({ id: 'item-1', title: 'Raamat 1' })
+    readOne.mockResolvedValueOnce({ id: 'item-1', title: 'Raamat 1', author_field: 'Tammsaare' })
 
     await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
 
-    expect(res.statusCode).toBe(403)
-    expect(res.body.error).toMatch(/Cannot read "images"/)
+    expect(res.statusCode).toBe(200)
+    expect(res.body.items).toEqual([])
+    expect(res.body.metadata).toHaveLength(1)
     expect(next).not.toHaveBeenCalled()
   })
 
