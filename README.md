@@ -25,7 +25,7 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
   - `iiif_collection` — collection name
   - `iiif_file` — relation field storing images
   - `iiif_canvas_label` — field used as manifest label
-  - `iiif_meta` — repeater listing the fields shown as manifest metadata (see [Manifest metadata and languages](#manifest-metadata-and-languages)). New rows use the subfield `meta` (a field name); the older `Key`/`Value` subfields still work and are read when `meta` is empty on that row
+  - `iiif_meta` — repeater listing the fields shown as manifest metadata (see [Manifest metadata and languages](#manifest-metadata-and-languages)). Each row has a `meta` subfield holding a field name. The older `Key`/`Value` subfields are **no longer read** — a row without `meta` is skipped
   - `annotation_files` — related annotation files (JSON/W3C annotations)
   - `alto_files` — related ALTO XML files
   - `txt_files` — related plain text files
@@ -88,20 +88,15 @@ Each `iiif_meta` row is read like this:
 
 | Row | Meaning |
 |---|---|
-| `{ "meta": "datum_display" }` | field name, label from the field's translations (use this) |
+| `{ "meta": "datum_display" }` | field name; label from the field's translations |
 | `{ "Key": null, "Value": null, "meta": "datum_display" }` | same — empty `Key`/`Value` beside `meta` are ignored |
-| `{ "Key": "Kuupäev", "Value": "datum_display" }` | legacy: `Key` is a fixed label shown in both languages, `Value` the field |
+| `{ "Key": "Kuupäev", "Value": "datum_display" }` | **skipped** — legacy rows are no longer read |
 
-If a row has both, `meta` wins. Rows with neither are skipped, so a collection
-can be migrated row by row: add the `meta` subfield, fill it in, check the
-manifest, then clear (and later remove) `Key` and `Value`. Rows not yet
-migrated keep working.
+A collection whose rows still only have `Key`/`Value` shows **no metadata** in
+its manifests until each row's `meta` subfield is filled in. Once a collection
+is migrated, `Key` and `Value` can be removed from the repeater.
 
-The extension also accepts a top-level `meta` field on `IIIF_settings` (a list
-or comma separated text of field names); it takes precedence over `iiif_meta`
-when present. This is optional — the repeater subfield is what is in use.
-
-Why a plain field name instead of a translated value in the settings: a Directus
+Why a plain field name instead of a typed label in the settings: a Directus
 repeater cannot hold a translations interface, and the label no longer needs to
 be typed in the settings at all.
 
@@ -170,7 +165,7 @@ There has been some discussion about the IIIF support for Directus: https://gith
 
 ## Versions
 ### Unreleased
-- Manifest `label` and metadata `label`/`value` are now built for both `et` and `en` instead of a hard-coded `et` (#9). Metadata labels come from the field's own Data Model translations; values can come from a `translations` relation. `iiif_meta` rows take a new `meta` subfield (field name); `Key`/`Value` rows keep working. See [Manifest metadata and languages](#manifest-metadata-and-languages).
+- Manifest `label` and metadata `label`/`value` are now built for both `et` and `en` instead of a hard-coded `et` (#9). Metadata labels come from the field's own Data Model translations; values can come from a `translations` relation. `iiif_meta` rows take a `meta` subfield (field name); legacy `Key`/`Value` rows are no longer read. See [Manifest metadata and languages](#manifest-metadata-and-languages).
 ### 1.0.13
 - Fixed `GET /manifest/:collection/:file_id` hanging forever (never responding, until the client's own timeout) instead of returning 404 for a nonexistent/deleted item, or a collection with no matching `IIIF_settings` row. Root cause: the whole async handler had no `try`/`catch`, and the code destructured/indexed straight into the (possibly `undefined`) results of `readByQuery`/`readOne` — a nonexistent item made this throw synchronously inside the async function with nothing to catch it, so Express never got a response to send. Found on production after deleting a test record and re-requesting its manifest.
 ### 1.0.12

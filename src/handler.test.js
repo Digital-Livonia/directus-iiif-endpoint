@@ -9,7 +9,7 @@ const settingsRow = (overrides = {}) => ({
   iiif_collection: 'books',
   iiif_file: 'images',
   iiif_canvas_label: 'title',
-  iiif_meta: [{ Key: 'Autor', Value: 'author_field' }],
+  iiif_meta: [{ meta: 'author_field' }],
   annotation_files: 'annotations',
   alto_files: 'alto',
   txt_files: 'txt',
@@ -126,8 +126,8 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     readByQuery.mockResolvedValueOnce([
       settingsRow({
         iiif_meta: [
-          { Key: 'Autor', Value: 'author_field' },
-          { Key: 'Aasta', Value: 'year_field' }
+          { meta: 'author_field' },
+          { meta: 'year_field' }
         ]
       })
     ])
@@ -143,8 +143,8 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
 
     expect(res.body.metadata).toEqual([
-      { label: { et: ['Autor'], en: ['Autor'] }, value: { et: ['Tammsaare'], en: ['Tammsaare'] } },
-      { label: { et: ['Aasta'], en: ['Aasta'] }, value: { et: ['1934'], en: ['1934'] } }
+      { label: { et: ['author_field'], en: ['author_field'] }, value: { et: ['Tammsaare'], en: ['Tammsaare'] } },
+      { label: { et: ['year_field'], en: ['year_field'] }, value: { et: ['1934'], en: ['1934'] } }
     ])
   })
 
@@ -182,43 +182,10 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     expect(readAllFields).toHaveBeenCalledWith('books')
   })
 
-  it('prefers the new `meta` setting and falls back to iiif_meta when it is empty', async () => {
-    readByQuery.mockResolvedValueOnce([
-      settingsRow({
-        meta: ['year_field'],
-        iiif_meta: [{ Key: 'Autor', Value: 'author_field' }]
-      })
-    ])
-    readOne
-      .mockResolvedValueOnce({
-        images: [{ directus_files_id: 'file-1' }],
-        title: 'Raamat 1',
-        author_field: 'Tammsaare',
-        year_field: '1934'
-      })
-      .mockResolvedValueOnce(fileRow())
-    await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
-    expect(res.body.metadata).toHaveLength(1)
-    expect(res.body.metadata[0].value).toEqual({ et: ['1934'], en: ['1934'] })
-
-    readByQuery.mockResolvedValueOnce([
-      settingsRow({ meta: [], iiif_meta: [{ Key: 'Autor', Value: 'author_field' }] })
-    ])
-    readOne
-      .mockResolvedValueOnce({
-        images: [{ directus_files_id: 'file-1' }],
-        title: 'Raamat 1',
-        author_field: 'Tammsaare'
-      })
-      .mockResolvedValueOnce(fileRow())
-    await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
-    expect(res.body.metadata[0].label).toEqual({ et: ['Autor'], en: ['Autor'] })
-  })
-
   it('reads translatable meta per locale from a translations relation', async () => {
     readByQuery.mockResolvedValueOnce([
       settingsRow({
-        iiif_meta: [{ Key: 'Pealkiri', Value: 'translations.title' }]
+        iiif_meta: [{ meta: 'translations.title' }]
       })
     ])
     readOne
@@ -235,7 +202,7 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
 
     expect(res.body.metadata).toEqual([
-      { label: { et: ['Pealkiri'], en: ['Pealkiri'] }, value: { et: ['Tere'], en: ['Hello'] } }
+      { label: { et: ['translations.title'], en: ['translations.title'] }, value: { et: ['Tere'], en: ['Hello'] } }
     ])
     const fields = readOne.mock.calls[0][1].fields
     expect(fields).toContain('translations.title')
@@ -246,8 +213,8 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     readByQuery.mockResolvedValueOnce([
       settingsRow({
         iiif_meta: [
-          { Key: 'Autor', Value: 'author_field' },
-          { Key: 'Fond', Value: 'fond_field' }
+          { meta: 'author_field' },
+          { meta: 'fond_field' }
         ]
       })
     ])
@@ -263,7 +230,7 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
 
     expect(res.body.metadata).toEqual([
-      { label: { et: ['Autor'], en: ['Autor'] }, value: { et: ['Tammsaare'], en: ['Tammsaare'] } }
+      { label: { et: ['author_field'], en: ['author_field'] }, value: { et: ['Tammsaare'], en: ['Tammsaare'] } }
     ])
   })
 

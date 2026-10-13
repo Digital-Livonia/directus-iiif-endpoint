@@ -121,8 +121,6 @@ export default {
             iiif_file,
             iiif_canvas_label,
             iiif_meta,
-            meta,
-            Meta,
             annotation_files,
             alto_files,
             txt_files
@@ -137,13 +135,7 @@ export default {
           ]
 
           // let's add fields from the user defined configuration
-          // `meta` is the newer setting (field names only); `iiif_meta`
-          // (Key/Value repeater) stays as the fallback until its rows have
-          // been moved over.
-          // Directus field keys are case-sensitive and the original repeater used
-          // capitalised subfield names, so `Meta` is accepted too.
-          const newMeta = [meta, Meta].map(toMetaList).find((v) => v.length > 0)
-          const metaEntries = (newMeta || toMetaList(iiif_meta))
+          const metaEntries = toMetaList(iiif_meta)
             .map(normalizeMetaEntry)
             .filter(Boolean)
           metaEntries.forEach((entry) => collectionDataFields.push(...metaFieldsFor(entry.field)))
@@ -286,7 +278,7 @@ export default {
           // request's accountability: it's only the label text, and the
           // values above still go through the permission-checked service.
           let fieldDefinitions = []
-          if (FieldsService && metaEntries.some((entry) => !entry.staticLabel)) {
+          if (FieldsService && metaEntries.length > 0) {
             try {
               const fieldsService = new FieldsService({ schema: req.schema })
               fieldDefinitions = await fieldsService.readAll(collection)
@@ -295,8 +287,7 @@ export default {
             }
           }
           const iiifMetaItems = metaEntries.map((entry) => {
-            const label = entry.staticLabel ??
-              buildFieldLabel(fieldDefinitions.find((f) => f.field === entry.field), entry.field)
+            const label = buildFieldLabel(fieldDefinitions.find((f) => f.field === entry.field), entry.field)
             return [label, resolveMetaValue(collectionData, entry.field)]
           })
           const image_sorted = imageDataArray.sort((a, b) =>
