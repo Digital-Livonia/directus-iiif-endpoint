@@ -2,11 +2,11 @@
 
 A human-readable catalogue of every automated test in this repo — what it asserts and why. For how to run tests, see [README.md § Testing](README.md#testing). This file mirrors the test suite; if you add or rename a test, update the matching entry here too.
 
-Current totals: **96 tests** across 2 files (`npm test`).
+Current totals: **154 tests** across 2 files (`npm test`).
 
 ---
 
-## Unit layer — `src/helpers.test.js` (68 tests)
+## Unit layer — `src/helpers.test.js` (112 tests)
 
 Tests the pure builder functions in `src/helpers.js` directly, with no Directus involved — fake image/annotation/ALTO/text objects go in, IIIF JSON comes out.
 
@@ -64,14 +64,50 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 - `@context` is the IIIF Presentation API v3 context URL
 - `type` is `"Manifest"`
 - `id` is built from `directusEndpoint` + `collection` + `fileId`
-- `label` uses the `et` locale
-- `iiifMeta` key/value pairs are mapped into `metadata` under the `et` locale
+- `label` is repeated for every locale (`et` and `en`), not hard-coded to `et`
+- `iiifMeta` label/value pairs are repeated for every locale in `metadata`
 - `service` block is **absent** when `hasAnnotations` is `false`
 - `service` block is present when `hasAnnotations` is `true`
 - `service["@id"]` mirrors the manifest `id` shape, with `/search/` instead of `/manifest/` (not a separate configured URL — see [README § Requirements](README.md#requirements))
 - Multiple metadata pairs all appear, in order
 - A metadata row whose value is `null` is omitted entirely (not rendered as the string `"null"`)
 - A metadata row whose value is `undefined` is likewise omitted
+
+### `resolveMetaValue` — a configured field path → its value
+- A plain field name returns the item's value unchanged
+- `translations.<field>`: each locale (`et` ← `et-EE`, `en` ← `en-US`) is taken from its own translation row
+- A locale with no row of its own (or an empty/whitespace one) falls back to the translation that exists
+- `languages_code` expanded to an object (`{ code }`) is accepted
+- A many-to-one path (`person.people_first_name`) returns the related item's value; `null` related item or `null` value gives `null`
+- `null` is returned when no translation has a value
+
+### `metaFieldsFor` — which Directus `fields` a configured path needs
+- A plain field is requested as-is
+- A relation path (`translations.title`, `person.people_first_name`) is requested via `<relation>.*`, **never** `languages_code` (regression test: naming `languages_code` made Directus answer 403 for `handwritings`, whose `person` relation has no such field)
+
+### `normalizeMetaEntry` — one `iiif_meta` repeater row → `{ field, parseEdtf }`
+- A bare string is a field name
+- The `meta` (or `field`) subfield of a row is the field name; empty `Key`/`Value` beside it are ignored
+- `parse_edtf` is carried as a boolean (`true`/`"true"` only)
+- Legacy `Key`/`Value` rows are **no longer read** (return `null`)
+- Empty/unknown entries return `null`
+
+### `toMetaList` — the `iiif_meta` setting as a list, whatever type the field is
+- Arrays pass through; a delimited string is split; a JSON string is parsed; a single object is wrapped; empty values give `[]`
+
+### `buildFieldLabel` — a field's name as shown in the Data Model
+- Uses each language's own field translation (`meta.translations`)
+- Falls back to the translation that exists, then to the field name
+
+### `createIiifCollectionJson` — localized and EDTF values
+- A localized value/label is emitted per locale
+- A translated canvas label becomes a per-locale manifest `label`
+- A parsed EDTF value is emitted as the parser's `et`/`en` text
+
+### `parseEdtfValue` — EDTF string → the shared parser's text per language
+- Table of inputs → `et`/`en` output: exact date, year+month, year, interval, uncertain (`?`), approximate (`~`), unspecified digit (`199X`), open start (`../1300`), set (`[1670..1672]`)
+- Surrounding whitespace is trimmed
+- Invalid or non-EDTF input (`abc`, `2004-06-11?`, empty, `null`, numbers) returns `null`, so the caller keeps the original value
 
 ### `extractOcrEntriesFromAnnotationPage` — turns a fetched annotation-list JSON into `ocr_entries` rows
 - Extracts text + region from a `resources` (IIIF v2 `AnnotationList`) shape
@@ -105,7 +141,7 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 
 ---
 
-## Integration layer — `src/handler.test.js` (28 tests)
+## Integration layer — `src/handler.test.js` (42 tests)
 
 Tests the actual Directus route handler in `src/index.js`, with `ItemsService` mocked (no real Directus instance). Verifies the full flow: read `IIIF_settings` → read the collection item → read each related file → build the manifest — i.e. that the pieces are wired together correctly, not just that each piece works in isolation.
 
@@ -114,6 +150,11 @@ Tests the actual Directus route handler in `src/index.js`, with `ItemsService` m
 - `ItemsService` is constructed once per collection (`IIIF_settings`, the target collection, `directus_files`) with the request's `schema`/`accountability` forwarded to each
 - The `IIIF_settings` lookup is filtered by the requested `collection` (`iiif_collection: { _eq: … }`)
 - Every configured `iiif_meta` field (not just one) is read from the collection item and mapped into manifest `metadata`
+- A bare field name is labelled with the field's own Data Model translation (`FieldsService`), per language; a field with none is labelled with its name
+- `translations.<field>` paths are read per locale from the item's translations rows, and the request asks for `translations.*` (not `languages_code`)
+- A row with `parse_edtf` shows the EDTF value as the parser's `et`/`en` text; without it the value is left exactly as stored
+- A `parse_edtf` value that is not valid EDTF keeps the original string, logs a warning, and the manifest is still `200`
+- An item with no images (or an image relation the caller cannot read) returns a manifest with empty `items`, not a `500`
 - A metadata row is omitted entirely when its underlying field value is `null`
 - Annotations and the search `service` block appear when a file's name matches an annotation
 - Annotations and the `service` block are absent when `annotation_files` isn't configured on the collection item
@@ -149,4 +190,4 @@ Tests the actual Directus route handler in `src/index.js`, with `ItemsService` m
 ## Coverage gaps (known, not yet tested)
 
 - **API layer** (live Directus instance) and **E2E layer** (viewer loads the manifest, e.g. Mirador) are manual-only per the README's test pyramid — no automated coverage exists or is currently planned for these.
-- Error paths are not covered: e.g. what happens when `IIIF_settings` has no row for the requested collection (`fieldSettings[0]` would be `undefined`), or when `ItemsService.readOne`/`readByQuery` rejects. The handler has no `try/catch` around its async body and never calls `next(error)`, so today these would surface as unhandled rejections rather than a clean HTTP error response — worth fixing and covering with a test if this becomes a real-world issue (e.g. a collection is renamed without updating `IIIF_settings`).
+- Error paths other than the ones above are only lightly covered: `ItemsService.readOne`/`readByQuery` rejecting is forwarded to `next(error)` by the handler's `try/catch`, but not every route has its own test for it.

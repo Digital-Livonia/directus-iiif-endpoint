@@ -76,6 +76,12 @@ The same rules apply to `iiif_canvas_label`, which becomes the manifest's own
 
 Rows are left out of the manifest when the item has no value for them.
 
+An item does not need to have images: with no files (or an image relation the
+caller's role cannot read) the manifest is still returned, with empty `items`
+and the metadata intact. If a manifest has metadata but no canvases for the
+public role while it works when you are logged in, check the public role's read
+permission on the image relation's junction collection and on `directus_files`.
+
 ### Setting it up
 
 1. In **Data Model**, make sure each field you want to show has its
@@ -201,9 +207,12 @@ When adding new functionality, cover each relevant pyramid layer:
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
-### Unreleased
-- `iiif_meta` rows accept a boolean `parse_edtf`: the field's EDTF value is shown as the shared parser's et/en text (#11). Unrecognised values are left unchanged and logged. Uses `@dl-tlu/edtf-parser` v1.1.0 (bundled).
-- Manifest `label` and metadata `label`/`value` are now built for both `et` and `en` instead of a hard-coded `et` (#9). Metadata labels come from the field's own Data Model translations; values can come from a `translations` relation. `iiif_meta` rows take a `meta` subfield (field name); legacy `Key`/`Value` rows are no longer read. See [Manifest metadata and languages](#manifest-metadata-and-languages).
+### 1.1.0
+- **Localized metadata (#9):** manifest `label` and metadata `label`/`value` are built for both `et` and `en` instead of a hard-coded `et`. A metadata label is the field's own Data Model translation; a value comes from the item, or from a `translations` relation (`translations.<field>`) or a many-to-one item (`person.<field>`) per language. See [Manifest metadata and languages](#manifest-metadata-and-languages).
+- **EDTF dates (#11):** an `iiif_meta` row with the boolean `parse_edtf` shows the field's EDTF value as the shared parser's `et`/`en` text. Unrecognised values are left unchanged and logged as a warning. Uses [`@dl-tlu/edtf-parser`](https://github.com/Digital-Livonia/edtf-parser) v1.1.0, bundled at build time.
+- **Breaking, settings:** `iiif_meta` rows are read from their `meta` subfield (a field name). The old `Key`/`Value` rows are no longer read; a collection that still has only those shows no metadata until `meta` is filled in.
+- Items without images, or an image relation the caller's role cannot read, return a manifest with empty `items` instead of a `500`.
+- Relation paths (`person.people_first_name`) no longer request `languages_code`, which made Directus answer `403` for relations that are not translation collections (seen on `handwritings`).
 ### 1.0.13
 - Fixed `GET /manifest/:collection/:file_id` hanging forever (never responding, until the client's own timeout) instead of returning 404 for a nonexistent/deleted item, or a collection with no matching `IIIF_settings` row. Root cause: the whole async handler had no `try`/`catch`, and the code destructured/indexed straight into the (possibly `undefined`) results of `readByQuery`/`readOne` — a nonexistent item made this throw synchronously inside the async function with nothing to catch it, so Express never got a response to send. Found on production after deleting a test record and re-requesting its manifest.
 ### 1.0.12
