@@ -76,6 +76,12 @@ The same rules apply to `iiif_canvas_label`, which becomes the manifest's own
 
 Rows are left out of the manifest when the item has no value for them.
 
+An item does not need to have images: with no files (or an image relation the
+caller's role cannot read) the manifest is still returned, with empty `items`
+and the metadata intact. If a manifest has metadata but no canvases for the
+public role while it works when you are logged in, check the public role's read
+permission on the image relation's junction collection and on `directus_files`.
+
 ### Setting it up
 
 1. In **Data Model**, make sure each field you want to show has its
