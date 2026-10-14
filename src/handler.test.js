@@ -194,6 +194,53 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     expect(next).not.toHaveBeenCalled()
   })
 
+  it('parses an EDTF value into et/en text when the row has parse_edtf', async () => {
+    readByQuery.mockResolvedValueOnce([
+      settingsRow({
+        iiif_meta: [
+          { meta: 'date_field', parse_edtf: true },
+          { meta: 'plain_field' }
+        ]
+      })
+    ])
+    readOne
+      .mockResolvedValueOnce({
+        images: [{ directus_files_id: 'file-1' }],
+        title: 'Raamat 1',
+        date_field: '1321?',
+        plain_field: '1321?'
+      })
+      .mockResolvedValueOnce(fileRow())
+
+    await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
+
+    expect(res.body.metadata[0].value).toEqual({ et: ['arvatavasti 1321'], en: ['uncertain 1321'] })
+    // without the checkbox the value is left exactly as stored
+    expect(res.body.metadata[1].value).toEqual({ et: ['1321?'], en: ['1321?'] })
+  })
+
+  it('keeps the original string and warns when a parse_edtf value is not valid EDTF', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    readByQuery.mockResolvedValueOnce([
+      settingsRow({ iiif_meta: [{ meta: 'date_field', parse_edtf: true }] })
+    ])
+    readOne
+      .mockResolvedValueOnce({
+        images: [{ directus_files_id: 'file-1' }],
+        title: 'Raamat 1',
+        date_field: 'umbes 1300'
+      })
+      .mockResolvedValueOnce(fileRow())
+
+    await invokeManifest({ params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.body.metadata[0].value).toEqual({ et: ['umbes 1300'], en: ['umbes 1300'] })
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn.mock.calls[0][0]).toMatch(/date_field.*not a recognised EDTF/)
+    warn.mockRestore()
+  })
+
   it('reads translatable meta per locale from a translations relation', async () => {
     readByQuery.mockResolvedValueOnce([
       settingsRow({
