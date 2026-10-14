@@ -14,6 +14,7 @@ import {
   resolveMetaValue,
   metaFieldsFor,
   normalizeMetaEntry,
+  parseEdtfValue,
   toMetaList,
   buildFieldLabel
 } from './helpers.js'
@@ -732,16 +733,23 @@ describe('createIiifCollectionJson — localized values', () => {
 
 describe('normalizeMetaEntry', () => {
   it('accepts a bare field name', () => {
-    expect(normalizeMetaEntry('datum_display')).toEqual({ field: 'datum_display' })
+    expect(normalizeMetaEntry('datum_display')).toEqual({ field: 'datum_display', parseEdtf: false })
   })
 
   it('reads the `meta` (or `field`) subfield of a repeater row', () => {
-    expect(normalizeMetaEntry({ meta: 'datum_display' })).toEqual({ field: 'datum_display' })
-    expect(normalizeMetaEntry({ field: 'datum_display' })).toEqual({ field: 'datum_display' })
+    expect(normalizeMetaEntry({ meta: 'datum_display' })).toEqual({ field: 'datum_display', parseEdtf: false })
+    expect(normalizeMetaEntry({ field: 'datum_display' })).toEqual({ field: 'datum_display', parseEdtf: false })
   })
 
   it('ignores empty Key/Value subfields beside `meta`', () => {
-    expect(normalizeMetaEntry({ Key: null, Value: null, meta: 'datum_display' })).toEqual({ field: 'datum_display' })
+    expect(normalizeMetaEntry({ Key: null, Value: null, meta: 'datum_display' })).toEqual({ field: 'datum_display', parseEdtf: false })
+  })
+
+  it('carries the parse_edtf checkbox of a repeater row', () => {
+    expect(normalizeMetaEntry({ meta: 'datum_display', parse_edtf: true })).toEqual({ field: 'datum_display', parseEdtf: true })
+    expect(normalizeMetaEntry({ meta: 'datum_display', parse_edtf: false }).parseEdtf).toBe(false)
+    expect(normalizeMetaEntry({ meta: 'datum_display', parse_edtf: null }).parseEdtf).toBe(false)
+    expect(normalizeMetaEntry({ meta: 'datum_display' }).parseEdtf).toBe(false)
   })
 
   it('no longer reads legacy Key/Value rows', () => {
@@ -793,5 +801,47 @@ describe('toMetaList', () => {
     expect(toMetaList({ field: 'a' })).toEqual([{ field: 'a' }])
     expect(toMetaList(null)).toEqual([])
     expect(toMetaList('  ')).toEqual([])
+  })
+})
+
+describe('parseEdtfValue', () => {
+  // EDTF input -> the shared parser's wording, per manifest language
+  const cases = [
+    ['exact date', '1985-06-11', '11. juuni 1985', '11. June 1985'],
+    ['year and month', '1985-06', 'juuni 1985', 'June 1985'],
+    ['year', '1985', '1985', '1985'],
+    ['interval', '1900/1910', '1900 – 1910', '1900 to 1910'],
+    ['uncertain', '1321?', 'arvatavasti 1321', 'uncertain 1321'],
+    ['approximate', '1321~', 'umbes 1321', 'approximately 1321'],
+    ['unspecified digit', '199X', '1990 aastakümne', '1990 decade'],
+    ['open start', '../1300', 'kuni 1300', 'until 1300'],
+    ['set', '[1670..1672]', 'üks järgmistest: 1670, 1671, 1672', 'one of: 1670, 1671, 1672']
+  ]
+
+  it.each(cases)('%s: %s', (_name, input, et, en) => {
+    expect(parseEdtfValue(input)).toEqual({ localized: true, values: { et, en } })
+  })
+
+  it('trims surrounding whitespace', () => {
+    expect(parseEdtfValue(' 1321? ').values.en).toBe('uncertain 1321')
+  })
+
+  it('returns null for invalid or non-EDTF input so the caller keeps the original', () => {
+    expect(parseEdtfValue('abc')).toBeNull()
+    expect(parseEdtfValue('2004-06-11?')).toBeNull()
+    expect(parseEdtfValue('')).toBeNull()
+    expect(parseEdtfValue(null)).toBeNull()
+    expect(parseEdtfValue(1985)).toBeNull()
+  })
+})
+
+describe('createIiifCollectionJson — EDTF values', () => {
+  it('emits the et/en parser output as the metadata value', () => {
+    const m = createIiifCollectionJson(
+      'X', [], 'books', 'id',
+      [[{ localized: true, values: { et: 'Kuupäev', en: 'Date' } }, parseEdtfValue('1321?')]],
+      true, false, 'https://example.org'
+    )
+    expect(m.metadata[0].value).toEqual({ et: ['arvatavasti 1321'], en: ['uncertain 1321'] })
   })
 })

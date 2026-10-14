@@ -1,3 +1,5 @@
+import { parseEDTF, isEDTFPattern } from '@dl-tlu/edtf-parser'
+
 export function findIdByFile (annotations, filename_download) {
   const annotation = annotations.find(
     (annotation) => annotation.filename_download === filename_download
@@ -184,21 +186,36 @@ export function toMetaList (value) {
 
 // One iiif_meta entry, in any of the shapes it can have:
 //   "datum_display"                  bare field name
-//   { meta: "datum_display" }        repeater subfield `meta` (or `field`)
-// Returns { field } or null for an empty/unknown entry. The label is always
+//   { meta: "datum_display" }        repeater subfield `meta` (or `field`),
+//                                    optionally with `parse_edtf: true`
+// Returns { field, parseEdtf } or null for an empty/unknown entry. The label is always
 // the field's own translated name (see buildFieldLabel); there are no static
 // labels.
 export function normalizeMetaEntry (entry) {
   if (typeof entry === 'string') {
-    return entry.trim() ? { field: entry.trim() } : null
+    return entry.trim() ? { field: entry.trim(), parseEdtf: false } : null
   }
   if (!entry || typeof entry !== 'object') return null
+  // `parse_edtf` is a boolean subfield of the repeater row
+  const parseEdtf = entry.parse_edtf === true || entry.parse_edtf === 'true'
   for (const name of ['meta', 'field', 'Meta', 'Field']) {
     if (typeof entry[name] === 'string' && entry[name].trim()) {
-      return { field: entry[name].trim() }
+      return { field: entry[name].trim(), parseEdtf }
     }
   }
   return null
+}
+
+// Renders an EDTF date string the way the shared parser words it, once per
+// manifest language: `1321?` -> { et: 'arvatavasti 1321', en: 'uncertain 1321' }.
+// The parser's text is used as-is. Returns null when the value isn't an EDTF
+// string the parser recognises, so the caller keeps the original value.
+export function parseEdtfValue (value) {
+  if (typeof value !== 'string' || !isEDTFPattern(value.trim())) return null
+  const text = value.trim()
+  const values = {}
+  for (const locale of Object.keys(META_LOCALES)) values[locale] = parseEDTF(text, locale)
+  return { localized: true, values }
 }
 
 // The label of a field as an editor sees it: the per-language names set under
