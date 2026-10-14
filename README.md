@@ -104,6 +104,39 @@ Why a plain field name instead of a typed label in the settings: a Directus
 repeater cannot hold a translations interface, and the label no longer needs to
 be typed in the settings at all.
 
+### EDTF dates (`parse_edtf`)
+
+Date fields that hold [EDTF](https://www.loc.gov/standards/datetime/) strings
+(`1321?`, `1470/1473`, `199X`, ...) can be shown as readable text instead of
+the raw notation. On the `iiif_meta` row for that field, tick **`parse_edtf`**:
+
+| Stored value | `et` | `en` |
+|---|---|---|
+| `1985-06-11` | 11. juuni 1985 | 11. June 1985 |
+| `1900/1910` | 1900 – 1910 | 1900 to 1910 |
+| `1321?` | arvatavasti 1321 | uncertain 1321 |
+| `1321~` | umbes 1321 | approximately 1321 |
+| `199X` | 1990 aastakümne | 1990 decade |
+| `../1300` | kuni 1300 | until 1300 |
+
+The wording is the shared parser's output, used as-is — the extension adds none
+of its own (so it matches what dl-app shows). The parser is
+[`@dl-tlu/edtf-parser`](https://github.com/Digital-Livonia/edtf-parser), pinned
+by tag in `package.json` and bundled into the extension at build time; its
+README lists every supported pattern and the DL-specific extensions.
+
+- A row without `parse_edtf` is left exactly as stored.
+- A value that is not recognised EDTF (typo, free text such as `umbes 1300`)
+  is shown unchanged and a warning is written to the Directus log
+  (`[iiif] "<field>" of <collection>/<id> is marked parse_edtf ...`), so a
+  single bad record never breaks a manifest. Use that warning to find records
+  to correct.
+- The label is unaffected: it still comes from the field's Data Model
+  translations.
+
+To bump the parser: change the tag in `package.json`, `npm install`, run the
+tests and rebuild.
+
 ### Permissions
 
 Values are read with the requesting user's permissions, as before, so a field
@@ -169,6 +202,7 @@ There has been some discussion about the IIIF support for Directus: https://gith
 
 ## Versions
 ### Unreleased
+- `iiif_meta` rows accept a boolean `parse_edtf`: the field's EDTF value is shown as the shared parser's et/en text (#11). Unrecognised values are left unchanged and logged. Uses `@dl-tlu/edtf-parser` v1.1.0 (bundled).
 - Manifest `label` and metadata `label`/`value` are now built for both `et` and `en` instead of a hard-coded `et` (#9). Metadata labels come from the field's own Data Model translations; values can come from a `translations` relation. `iiif_meta` rows take a `meta` subfield (field name); legacy `Key`/`Value` rows are no longer read. See [Manifest metadata and languages](#manifest-metadata-and-languages).
 ### 1.0.13
 - Fixed `GET /manifest/:collection/:file_id` hanging forever (never responding, until the client's own timeout) instead of returning 404 for a nonexistent/deleted item, or a collection with no matching `IIIF_settings` row. Root cause: the whole async handler had no `try`/`catch`, and the code destructured/indexed straight into the (possibly `undefined`) results of `readByQuery`/`readOne` — a nonexistent item made this throw synchronously inside the async function with nothing to catch it, so Express never got a response to send. Found on production after deleting a test record and re-requesting its manifest.

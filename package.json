@@ -39,5 +39,8 @@
 			"vite": "^5.4.21",
 			"axios": "^1.19.0"
 		}
+	},
+	"dependencies": {
+		"@dl-tlu/edtf-parser": "https://github.com/Digital-Livonia/edtf-parser/archive/refs/tags/v1.1.0.tar.gz"
 	}
 }

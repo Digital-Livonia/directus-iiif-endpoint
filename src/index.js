@@ -13,6 +13,7 @@ import {
   resolveMetaValue,
   metaFieldsFor,
   normalizeMetaEntry,
+  parseEdtfValue,
   toMetaList,
   buildFieldLabel
 } from './helpers.js'
@@ -297,7 +298,18 @@ export default {
               fieldDefinitions.find((f) => f.field === entry.field) ||
               fieldDefinitions.find((f) => f.field === entry.field.split('.')[0])
             const label = buildFieldLabel(definition, entry.field)
-            return [label, resolveMetaValue(collectionData, entry.field)]
+            let value = resolveMetaValue(collectionData, entry.field)
+            if (entry.parseEdtf && value !== null && value !== undefined) {
+              const parsed = parseEdtfValue(value)
+              if (parsed) {
+                value = parsed
+              } else {
+                // not valid EDTF: keep the original text rather than break
+                // the manifest
+                console.warn(`[iiif] "${entry.field}" of ${collection}/${fileId} is marked parse_edtf but is not a recognised EDTF value: ${JSON.stringify(value)}`)
+              }
+            }
+            return [label, value]
           })
           const image_sorted = imageDataArray.sort((a, b) =>
             a.title > b.title ? 1 : -1
