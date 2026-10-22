@@ -719,11 +719,16 @@ describe('createIiifCollectionJson — requiredStatement (#8)', () => {
       et: ['Esitatud Digital Livonia projekti poolt.'],
       en: ['Provided by Digital Livonia project.']
     })
-    expect(build('  ').requiredStatement.value.en).toEqual(['Provided by Digital Livonia project.'])
+    expect(build({ et: '  ', en: ' ' }).requiredStatement.value.en).toEqual(['Provided by Digital Livonia project.'])
   })
 
-  it('uses the collection-level text when configured', () => {
-    expect(build('CC BY 4.0').requiredStatement.value).toEqual({ et: ['CC BY 4.0'], en: ['CC BY 4.0'] })
+  it('uses the collection-level text per language, defaulting the other', () => {
+    expect(build({ et: 'CC BY 4.0 et', en: 'CC BY 4.0' }).requiredStatement.value).toEqual({
+      et: ['CC BY 4.0 et'], en: ['CC BY 4.0']
+    })
+    expect(build({ en: 'Only English' }).requiredStatement.value).toEqual({
+      et: ['Esitatud Digital Livonia projekti poolt.'], en: ['Only English']
+    })
   })
 
   it('has a provider with a logo', () => {

@@ -125,7 +125,8 @@ export default {
             annotation_files,
             alto_files,
             txt_files,
-            iiif_required_statement
+            iiif_required_statement_et,
+            iiif_required_statement_en
           } = fieldSettings[0]
 
           const collectionDataFields = [
@@ -329,7 +330,7 @@ export default {
               true, // sorted
               hasAnnotations,
               directusEndpoint,
-              iiif_required_statement
+              { et: iiif_required_statement_et, en: iiif_required_statement_en }
             )
           )
         } catch (error) {
