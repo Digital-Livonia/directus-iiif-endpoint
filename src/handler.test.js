@@ -104,7 +104,10 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     readByQuery.mockResolvedValueOnce([settingsRow({ iiif_required_statement_et: 'CC BY et', iiif_required_statement_en: 'CC BY 4.0' })])
     readOne.mockResolvedValueOnce(item)
     await invokeManifest(req)
-    expect(res.body.requiredStatement.value).toEqual({ et: ['CC BY et'], en: ['CC BY 4.0'] })
+    expect(res.body.requiredStatement.value).toEqual({
+      et: ['CC BY et Vahendatud Digital Livonia projekti poolt.'],
+      en: ['CC BY 4.0 Provided by Digital Livonia project.']
+    })
 
     readByQuery.mockResolvedValueOnce([settingsRow()])
     readOne.mockResolvedValueOnce(item)

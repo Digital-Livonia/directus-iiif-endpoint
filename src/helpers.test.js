@@ -716,18 +716,18 @@ describe('createIiifCollectionJson — requiredStatement (#8)', () => {
 
   it('falls back to the default text when none is configured', () => {
     expect(build(undefined).requiredStatement.value).toEqual({
-      et: ['Esitatud Digital Livonia projekti poolt.'],
+      et: ['Vahendatud Digital Livonia projekti poolt.'],
       en: ['Provided by Digital Livonia project.']
     })
     expect(build({ et: '  ', en: ' ' }).requiredStatement.value.en).toEqual(['Provided by Digital Livonia project.'])
   })
 
-  it('uses the collection-level text per language, defaulting the other', () => {
+  it('puts the collection-level text per language before the project line', () => {
     expect(build({ et: 'CC BY 4.0 et', en: 'CC BY 4.0' }).requiredStatement.value).toEqual({
-      et: ['CC BY 4.0 et'], en: ['CC BY 4.0']
+      et: ['CC BY 4.0 et Vahendatud Digital Livonia projekti poolt.'], en: ['CC BY 4.0 Provided by Digital Livonia project.']
     })
     expect(build({ en: 'Only English' }).requiredStatement.value).toEqual({
-      et: ['Esitatud Digital Livonia projekti poolt.'], en: ['Only English']
+      et: ['Vahendatud Digital Livonia projekti poolt.'], en: ['Only English Provided by Digital Livonia project.']
     })
   })
 

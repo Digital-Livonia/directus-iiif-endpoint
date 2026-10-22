@@ -258,10 +258,10 @@ const toLanguageMap = (value) => {
   )
 }
 
-// Shown on every manifest; a collection's IIIF_settings row can override
-// each language with `iiif_required_statement_et` / `_en` (issue #8).
+// Shown on every manifest; a collection's IIIF_settings row can put its own
+// text in front of it, per language, with `iiif_required_statement_et` / `_en` (issue #8).
 export const DEFAULT_REQUIRED_STATEMENT = {
-  et: ['Esitatud Digital Livonia projekti poolt.'],
+  et: ['Vahendatud Digital Livonia projekti poolt.'],
   en: ['Provided by Digital Livonia project.']
 }
 
@@ -289,11 +289,12 @@ export const createIiifCollectionJson = (
   directusEndpoint,
   requiredStatement
 ) => {
-  const pick = (text, fallback) =>
-    typeof text === 'string' && text.trim() ? [text.trim()] : fallback
+  // the collection's own text comes first, the project line always closes it
+  const compose = (text, suffix) =>
+    [typeof text === 'string' && text.trim() ? `${text.trim()} ${suffix}` : suffix]
   const statement = {
-    et: pick(requiredStatement?.et, DEFAULT_REQUIRED_STATEMENT.et),
-    en: pick(requiredStatement?.en, DEFAULT_REQUIRED_STATEMENT.en)
+    et: compose(requiredStatement?.et, DEFAULT_REQUIRED_STATEMENT.et[0]),
+    en: compose(requiredStatement?.en, DEFAULT_REQUIRED_STATEMENT.en[0])
   }
   // omit metadata rows with no value entirely, rather than showing a
   // literal "null" - a missing IIIF_settings-configured field means
