@@ -208,6 +208,8 @@ When adding new functionality, cover each relevant pyramid layer:
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
+### Unreleased (on `development`)
+- **Required statement and provider (#8):** every manifest has a `requiredStatement` (label `Omistus` / `Attribution`) and a `provider` (Digital Livonia, with the TLU logo). The statement always ends with the project line, `et`: "Vahendatud Digital Livonia projekti poolt." / `en`: "Provided by Digital Livonia project."; the optional `IIIF_settings` fields `iiif_required_statement_et` and `iiif_required_statement_en` put a collection's own text (licence, rights) in front of it. Add both as plain text fields to `IIIF_settings`; end the text with a full stop, as the line is joined with a space.
 ### 1.1.0
 - **Localized metadata (#9):** manifest `label` and metadata `label`/`value` are built for both `et` and `en` instead of a hard-coded `et`. A metadata label is the field's own Data Model translation; a value comes from the item, or from a `translations` relation (`translations.<field>`) or a many-to-one item (`person.<field>`) per language. See [Manifest metadata and languages](#manifest-metadata-and-languages).
 - **EDTF dates (#11):** an `iiif_meta` row with the boolean `parse_edtf` shows the field's EDTF value as the shared parser's `et`/`en` text. Unrecognised values are left unchanged and logged as a warning. Uses [`@dl-tlu/edtf-parser`](https://github.com/Digital-Livonia/edtf-parser) v1.1.0, bundled at build time.
