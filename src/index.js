@@ -124,7 +124,8 @@ export default {
             iiif_meta,
             annotation_files,
             alto_files,
-            txt_files
+            txt_files,
+            iiif_required_statement
           } = fieldSettings[0]
 
           const collectionDataFields = [
@@ -327,7 +328,8 @@ export default {
               iiifMetaItems,
               true, // sorted
               hasAnnotations,
-              directusEndpoint
+              directusEndpoint,
+              iiif_required_statement
             )
           )
         } catch (error) {

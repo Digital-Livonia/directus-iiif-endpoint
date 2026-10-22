@@ -258,6 +258,23 @@ const toLanguageMap = (value) => {
   )
 }
 
+// Shown on every manifest unless the collection's IIIF_settings row sets
+// its own `iiif_required_statement` (issue #8).
+export const DEFAULT_REQUIRED_STATEMENT = 'Provided by Digital Livonia project.'
+
+const PROVIDER = {
+  id: 'https://www.tlu.ee/',
+  type: 'Agent',
+  label: { et: ['Digital Livonia'], en: ['Digital Livonia'] },
+  logo: [
+    {
+      id: 'https://www.tlu.ee/sites/default/files/TUKO/%C3%9Clikoolo%20logo/TLU-logo-pilt-vrv-ing-suur.jpg',
+      type: 'Image',
+      format: 'image/jpeg'
+    }
+  ]
+}
+
 export const createIiifCollectionJson = (
   canvasLabel,
   items,
@@ -266,8 +283,13 @@ export const createIiifCollectionJson = (
   iiifMeta,
   sorted,
   hasAnnotations = false,
-  directusEndpoint
+  directusEndpoint,
+  requiredStatement
 ) => {
+  const statement =
+    typeof requiredStatement === 'string' && requiredStatement.trim()
+      ? requiredStatement.trim()
+      : DEFAULT_REQUIRED_STATEMENT
   // omit metadata rows with no value entirely, rather than showing a
   // literal "null" - a missing IIIF_settings-configured field means
   // there's nothing to display, not that "null" is the value
@@ -285,6 +307,11 @@ export const createIiifCollectionJson = (
     type: 'Manifest',
     label: toLanguageMap(canvasLabel),
     metadata: iiifMetaItems,
+    requiredStatement: {
+      label: { et: ['Omistus'], en: ['Attribution'] },
+      value: toLanguageMap(statement)
+    },
+    provider: [PROVIDER],
     items,
     ...(hasAnnotations
       ? {
