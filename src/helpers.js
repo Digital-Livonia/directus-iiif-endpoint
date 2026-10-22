@@ -258,6 +258,26 @@ const toLanguageMap = (value) => {
   )
 }
 
+// Shown on every manifest; a collection's IIIF_settings row can put its own
+// text in front of it, per language, with `iiif_required_statement_et` / `_en` (issue #8).
+export const DEFAULT_REQUIRED_STATEMENT = {
+  et: ['Vahendatud Digital Livonia projekti poolt.'],
+  en: ['Provided by Digital Livonia project.']
+}
+
+const PROVIDER = {
+  id: 'https://www.tlu.ee/',
+  type: 'Agent',
+  label: { et: ['Digital Livonia'], en: ['Digital Livonia'] },
+  logo: [
+    {
+      id: 'https://www.tlu.ee/sites/default/files/TUKO/%C3%9Clikoolo%20logo/TLU-logo-pilt-vrv-ing-suur.jpg',
+      type: 'Image',
+      format: 'image/jpeg'
+    }
+  ]
+}
+
 export const createIiifCollectionJson = (
   canvasLabel,
   items,
@@ -266,8 +286,16 @@ export const createIiifCollectionJson = (
   iiifMeta,
   sorted,
   hasAnnotations = false,
-  directusEndpoint
+  directusEndpoint,
+  requiredStatement
 ) => {
+  // the collection's own text comes first, the project line always closes it
+  const compose = (text, suffix) =>
+    [typeof text === 'string' && text.trim() ? `${text.trim()} ${suffix}` : suffix]
+  const statement = {
+    et: compose(requiredStatement?.et, DEFAULT_REQUIRED_STATEMENT.et[0]),
+    en: compose(requiredStatement?.en, DEFAULT_REQUIRED_STATEMENT.en[0])
+  }
   // omit metadata rows with no value entirely, rather than showing a
   // literal "null" - a missing IIIF_settings-configured field means
   // there's nothing to display, not that "null" is the value
@@ -285,6 +313,11 @@ export const createIiifCollectionJson = (
     type: 'Manifest',
     label: toLanguageMap(canvasLabel),
     metadata: iiifMetaItems,
+    requiredStatement: {
+      label: { et: ['Omistus'], en: ['Attribution'] },
+      value: statement
+    },
+    provider: [PROVIDER],
     items,
     ...(hasAnnotations
       ? {

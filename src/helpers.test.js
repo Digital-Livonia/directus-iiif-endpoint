@@ -710,6 +710,32 @@ describe('metaFieldsFor', () => {
   })
 })
 
+describe('createIiifCollectionJson — requiredStatement (#8)', () => {
+  const build = (statement) =>
+    createIiifCollectionJson('L', [], 'books', 'id', [], true, false, BASE, statement)
+
+  it('falls back to the default text when none is configured', () => {
+    expect(build(undefined).requiredStatement.value).toEqual({
+      et: ['Vahendatud Digital Livonia projekti poolt.'],
+      en: ['Provided by Digital Livonia project.']
+    })
+    expect(build({ et: '  ', en: ' ' }).requiredStatement.value.en).toEqual(['Provided by Digital Livonia project.'])
+  })
+
+  it('puts the collection-level text per language before the project line', () => {
+    expect(build({ et: 'CC BY 4.0 et', en: 'CC BY 4.0' }).requiredStatement.value).toEqual({
+      et: ['CC BY 4.0 et Vahendatud Digital Livonia projekti poolt.'], en: ['CC BY 4.0 Provided by Digital Livonia project.']
+    })
+    expect(build({ en: 'Only English' }).requiredStatement.value).toEqual({
+      et: ['Vahendatud Digital Livonia projekti poolt.'], en: ['Only English Provided by Digital Livonia project.']
+    })
+  })
+
+  it('has a provider with a logo', () => {
+    expect(build().provider[0].logo[0].type).toBe('Image')
+  })
+})
+
 describe('createIiifCollectionJson — localized values', () => {
   it('emits per-locale label and value for translated metadata', () => {
     const m = createIiifCollectionJson(

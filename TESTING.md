@@ -6,7 +6,7 @@ Current totals: **154 tests** across 2 files (`npm test`).
 
 ---
 
-## Unit layer — `src/helpers.test.js` (112 tests)
+## Unit layer — `src/helpers.test.js` (115 tests)
 
 Tests the pure builder functions in `src/helpers.js` directly, with no Directus involved — fake image/annotation/ALTO/text objects go in, IIIF JSON comes out.
 
@@ -104,6 +104,11 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 - A translated canvas label becomes a per-locale manifest `label`
 - A parsed EDTF value is emitted as the parser's `et`/`en` text
 
+### `createIiifCollectionJson` — `requiredStatement` and `provider` (#8)
+- With no collection text the statement is the bilingual project line alone (`et`: Vahendatud Digital Livonia projekti poolt. / `en`: Provided by Digital Livonia project.)
+- A collection's `et`/`en` text comes first, the project line always closes it; each language is independent, blank text counts as none
+- `provider` carries the logo as an `Image`
+
 ### `parseEdtfValue` — EDTF string → the shared parser's text per language
 - Table of inputs → `et`/`en` output: exact date, year+month, year, interval, uncertain (`?`), approximate (`~`), unspecified digit (`199X`), open start (`../1300`), set (`[1670..1672]`)
 - Surrounding whitespace is trimmed
@@ -141,7 +146,7 @@ Tests the pure builder functions in `src/helpers.js` directly, with no Directus 
 
 ---
 
-## Integration layer — `src/handler.test.js` (42 tests)
+## Integration layer — `src/handler.test.js` (43 tests)
 
 Tests the actual Directus route handler in `src/index.js`, with `ItemsService` mocked (no real Directus instance). Verifies the full flow: read `IIIF_settings` → read the collection item → read each related file → build the manifest — i.e. that the pieces are wired together correctly, not just that each piece works in isolation.
 
@@ -156,6 +161,7 @@ Tests the actual Directus route handler in `src/index.js`, with `ItemsService` m
 - A `parse_edtf` value that is not valid EDTF keeps the original string, logs a warning, and the manifest is still `200`
 - An item with no images (or an image relation the caller cannot read) returns a manifest with empty `items`, not a `500`
 - A metadata row is omitted entirely when its underlying field value is `null`
+- `iiif_required_statement_et`/`_en` from the `IIIF_settings` row end up in the manifest's `requiredStatement`, followed by the project line; without them only the project line
 - Annotations and the search `service` block appear when a file's name matches an annotation
 - Annotations and the `service` block are absent when `annotation_files` isn't configured on the collection item
 - The canvas image body is built via the IIIF Image API using `filename_disk` (not `filename_download`), with the `ImageService3` service block

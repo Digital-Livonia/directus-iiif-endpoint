@@ -97,6 +97,24 @@ describe('IIIF manifest handler — integration (mocked ItemsService)', () => {
     expect(res.body.items).toHaveLength(1)
   })
 
+  it('passes the collection\'s iiif_required_statement_et/_en into the manifest, else the default (#8)', async () => {
+    const item = { images: [], title: 'Raamat 1', author_field: 'x' }
+    const req = { params: { collection: 'books', file_id: 'item-1' }, schema: {}, accountability: {} }
+
+    readByQuery.mockResolvedValueOnce([settingsRow({ iiif_required_statement_et: 'CC BY et', iiif_required_statement_en: 'CC BY 4.0' })])
+    readOne.mockResolvedValueOnce(item)
+    await invokeManifest(req)
+    expect(res.body.requiredStatement.value).toEqual({
+      et: ['CC BY et Vahendatud Digital Livonia projekti poolt.'],
+      en: ['CC BY 4.0 Provided by Digital Livonia project.']
+    })
+
+    readByQuery.mockResolvedValueOnce([settingsRow()])
+    readOne.mockResolvedValueOnce(item)
+    await invokeManifest(req)
+    expect(res.body.requiredStatement.value.en).toEqual(['Provided by Digital Livonia project.'])
+  })
+
   it('constructs ItemsService per collection with schema/accountability forwarded from the request', async () => {
     readByQuery.mockResolvedValueOnce([settingsRow()])
     readOne

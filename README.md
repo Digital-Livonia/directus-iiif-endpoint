@@ -29,6 +29,7 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
   - `annotation_files` — related annotation files (JSON/W3C annotations)
   - `alto_files` — related ALTO XML files
   - `txt_files` — related plain text files
+  - `iiif_required_statement_et`, `iiif_required_statement_en` — *optional* texts for the manifest's `requiredStatement` (rights/attribution line), one per language. The project line is always appended after the collection's text (`<text> Provided by Digital Livonia project.` / `<text> Vahendatud Digital Livonia projekti poolt.`); with no text, the line stands alone. The manifest also carries a `provider` with the TLU logo.
 - `annotation_files`, `alto_files`, and `txt_files` are matched to an image by filename: the image's filename stem (everything before the last `.`) must equal the stem of the related file, e.g. `page001.jpg` ↔ `page001.json` / `page001.xml` / `page001.txt`. Unmatched files are silently skipped for that canvas.
 
 ## Manifest metadata and languages
@@ -207,6 +208,8 @@ When adding new functionality, cover each relevant pyramid layer:
 There has been some discussion about the IIIF support for Directus: https://github.com/directus/directus/discussions/15495
 
 ## Versions
+### Unreleased (on `development`)
+- **Required statement and provider (#8):** every manifest has a `requiredStatement` (label `Omistus` / `Attribution`) and a `provider` (Digital Livonia, with the TLU logo). The statement always ends with the project line, `et`: "Vahendatud Digital Livonia projekti poolt." / `en`: "Provided by Digital Livonia project."; the optional `IIIF_settings` fields `iiif_required_statement_et` and `iiif_required_statement_en` put a collection's own text (licence, rights) in front of it. Add both as plain text fields to `IIIF_settings`; end the text with a full stop, as the line is joined with a space.
 ### 1.1.0
 - **Localized metadata (#9):** manifest `label` and metadata `label`/`value` are built for both `et` and `en` instead of a hard-coded `et`. A metadata label is the field's own Data Model translation; a value comes from the item, or from a `translations` relation (`translations.<field>`) or a many-to-one item (`person.<field>`) per language. See [Manifest metadata and languages](#manifest-metadata-and-languages).
 - **EDTF dates (#11):** an `iiif_meta` row with the boolean `parse_edtf` shows the field's EDTF value as the shared parser's `et`/`en` text. Unrecognised values are left unchanged and logged as a warning. Uses [`@dl-tlu/edtf-parser`](https://github.com/Digital-Livonia/edtf-parser) v1.1.0, bundled at build time.
