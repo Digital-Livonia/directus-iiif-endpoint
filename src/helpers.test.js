@@ -716,7 +716,7 @@ describe('createIiifCollectionJson — requiredStatement (#8)', () => {
 
   it('falls back to the default text when none is configured', () => {
     expect(build(undefined).requiredStatement.value).toEqual({
-      et: ['Provided by Digital Livonia project.'],
+      et: ['Esitatud Digital Livonia projekti poolt.'],
       en: ['Provided by Digital Livonia project.']
     })
     expect(build('  ').requiredStatement.value.en).toEqual(['Provided by Digital Livonia project.'])

@@ -260,7 +260,10 @@ const toLanguageMap = (value) => {
 
 // Shown on every manifest unless the collection's IIIF_settings row sets
 // its own `iiif_required_statement` (issue #8).
-export const DEFAULT_REQUIRED_STATEMENT = 'Provided by Digital Livonia project.'
+export const DEFAULT_REQUIRED_STATEMENT = {
+  et: ['Esitatud Digital Livonia projekti poolt.'],
+  en: ['Provided by Digital Livonia project.']
+}
 
 const PROVIDER = {
   id: 'https://www.tlu.ee/',
@@ -288,7 +291,7 @@ export const createIiifCollectionJson = (
 ) => {
   const statement =
     typeof requiredStatement === 'string' && requiredStatement.trim()
-      ? requiredStatement.trim()
+      ? toLanguageMap(requiredStatement.trim())
       : DEFAULT_REQUIRED_STATEMENT
   // omit metadata rows with no value entirely, rather than showing a
   // literal "null" - a missing IIIF_settings-configured field means
@@ -309,7 +312,7 @@ export const createIiifCollectionJson = (
     metadata: iiifMetaItems,
     requiredStatement: {
       label: { et: ['Omistus'], en: ['Attribution'] },
-      value: toLanguageMap(statement)
+      value: statement
     },
     provider: [PROVIDER],
     items,

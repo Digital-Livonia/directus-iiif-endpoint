@@ -29,7 +29,7 @@ Adds [IIIF Presentation API 3.0](https://iiif.io/api/presentation/3.0/) support 
   - `annotation_files` — related annotation files (JSON/W3C annotations)
   - `alto_files` — related ALTO XML files
   - `txt_files` — related plain text files
-  - `iiif_required_statement` — *optional* text for the manifest's `requiredStatement` (rights/attribution line). Empty or missing falls back to `Provided by Digital Livonia project.` The manifest also carries a `provider` with the TLU logo.
+  - `iiif_required_statement` — *optional* text for the manifest's `requiredStatement` (rights/attribution line). The text is used for both `et` and `en`. Empty or missing falls back to a bilingual default (`et`: "Esitatud Digital Livonia projekti poolt.", `en`: "Provided by Digital Livonia project.") The manifest also carries a `provider` with the TLU logo.
 - `annotation_files`, `alto_files`, and `txt_files` are matched to an image by filename: the image's filename stem (everything before the last `.`) must equal the stem of the related file, e.g. `page001.jpg` ↔ `page001.json` / `page001.xml` / `page001.txt`. Unmatched files are silently skipped for that canvas.
 
 ## Manifest metadata and languages
